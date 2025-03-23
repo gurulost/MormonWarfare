@@ -1,5 +1,4 @@
 import { Scene } from 'phaser';
-import { TILE_SIZE } from '../config';
 
 /**
  * Tutorial step interface
@@ -41,24 +40,11 @@ export class TutorialManager {
    * Initialize the tutorial steps sequence
    */
   private initTutorialSteps() {
-    // Define tutorial steps based on the Book of Mormon War RTS game mechanics
     this.steps = [
       {
         id: 'welcome',
-        message: 'Welcome to the Book of Mormon War RTS! This tutorial will guide you through the basic mechanics of the game.',
+        message: 'Welcome to the Book of Mormon Wars! This tutorial will guide you through the basics of the game.',
         position: 'bottom',
-        actions: [
-          {
-            text: 'Continue',
-            callback: () => this.nextStep()
-          }
-        ]
-      },
-      {
-        id: 'cityCenter',
-        message: 'This is your City Center. It is your main building for producing workers and storing resources.',
-        target: 'cityCenter', // ID or reference to the city center object
-        position: 'top',
         actions: [
           {
             text: 'Continue',
@@ -68,8 +54,9 @@ export class TutorialManager {
       },
       {
         id: 'resources',
-        message: 'You need resources to build your civilization. Look for food (green) and ore (gray) on the map.',
-        position: 'top',
+        message: 'These are your resources. You need food to train units and ore to build structures.',
+        target: 'resources-display',
+        position: 'bottom',
         actions: [
           {
             text: 'Continue',
@@ -78,79 +65,83 @@ export class TutorialManager {
         ]
       },
       {
-        id: 'trainWorker',
-        message: 'Let\'s train a worker to gather resources. Click on your City Center, then select "Train Worker".',
-        target: 'cityCenter',
-        position: 'bottom',
+        id: 'select_worker',
+        message: 'Click on a worker unit to select it. Workers gather resources and build structures.',
+        target: 'worker-unit',
+        position: 'right',
         completeCondition: () => {
-          // Check if at least one worker unit exists
-          const workerCount = (this.scene as any).unitManager?.getUnitsByTypeAndPlayer(
-            (this.scene as any).getLocalPlayerId(),
-            'worker'
-          ).length;
-          return workerCount > 0;
-        },
-        autoAdvance: true
-      },
-      {
-        id: 'selectWorker',
-        message: 'Great! Now select your worker by clicking on it.',
-        completeCondition: () => {
-          // Check if a worker is selected
-          const selectedUnits = (this.scene as any).getSelectedUnits();
-          if (selectedUnits.length === 0) return false;
-          
+          // Check if player has selected a worker unit
           const unitManager = (this.scene as any).unitManager;
-          const unit = unitManager.getUnit(selectedUnits[0]);
-          return unit && unit.type === 'worker';
+          const selectedUnits = (this.scene as any).selectedUnits || [];
+          if (!unitManager || selectedUnits.length === 0) return false;
+          
+          const selectedWorkers = selectedUnits.filter(id => {
+            const unit = unitManager.getUnit(id);
+            return unit && unit.type === 'worker';
+          });
+          
+          return selectedWorkers.length > 0;
         },
         autoAdvance: true
       },
       {
-        id: 'gatherResources',
-        message: 'Now, right-click on a nearby food (green) resource to gather it.',
+        id: 'gather_resources',
+        message: 'Now right-click on a resource (food or ore) to gather it. Workers will automatically collect and return resources.',
+        target: 'resource-node',
+        position: 'bottom',
         completeCondition: () => {
           // Check if any worker is gathering resources
           const unitManager = (this.scene as any).unitManager;
-          const workers = unitManager.getUnitsByTypeAndPlayer(
-            (this.scene as any).getLocalPlayerId(),
-            'worker'
+          if (!unitManager) return false;
+          
+          const units = unitManager.getAllUnits();
+          const gatheringWorkers = units.filter(unit => 
+            unit.type === 'worker' && unit.isGathering
           );
-          return workers.some(worker => worker.isGathering);
+          
+          return gatheringWorkers.length > 0;
         },
         autoAdvance: true
       },
       {
-        id: 'buildBarracks',
-        message: 'Once you have enough resources, let\'s build a Barracks. Select a worker, then click the "Build Barracks" button.',
+        id: 'build_structure',
+        message: 'Select a worker, then click the "Build" button to create your first building. Buildings are used to train units and research technology.',
+        target: 'build-button',
+        position: 'right',
         completeCondition: () => {
-          // Check if barracks exists
+          // Check if player has built at least one building
           const buildingManager = (this.scene as any).buildingManager;
-          const barracks = buildingManager.getBuildingsByTypeAndPlayer(
-            (this.scene as any).getLocalPlayerId(),
-            'barracks'
-          );
-          return barracks.length > 0;
+          if (!buildingManager) return false;
+          
+          const playerBuildings = buildingManager.getBuildingsByPlayer((this.scene as any).localPlayerId);
+          return playerBuildings.length > 0;
         },
         autoAdvance: true
       },
       {
-        id: 'trainMelee',
-        message: 'Now select your Barracks and train a Melee unit by clicking the "Train Melee" button.',
+        id: 'train_unit',
+        message: 'Select your building and click "Train" to create a combat unit. Different buildings can create different unit types.',
+        target: 'train-button',
+        position: 'bottom',
         completeCondition: () => {
-          // Check if melee unit exists
+          // Check if player has trained at least one combat unit
           const unitManager = (this.scene as any).unitManager;
-          const meleeUnits = unitManager.getUnitsByTypeAndPlayer(
-            (this.scene as any).getLocalPlayerId(),
-            'melee'
+          if (!unitManager) return false;
+          
+          const playerUnits = unitManager.getUnitsByPlayer((this.scene as any).localPlayerId);
+          const combatUnits = playerUnits.filter(unit => 
+            unit.type !== 'worker'
           );
-          return meleeUnits.length > 0;
+          
+          return combatUnits.length > 0;
         },
         autoAdvance: true
       },
       {
-        id: 'armyMovement',
-        message: 'You can move your units by selecting them and right-clicking on the destination.',
+        id: 'research',
+        message: 'Click the "Tech Tree" button to open the technology panel. Research new technologies to unlock better units and buildings.',
+        target: 'tech-tree-button',
+        position: 'bottom',
         actions: [
           {
             text: 'Continue',
@@ -159,9 +150,8 @@ export class TutorialManager {
         ]
       },
       {
-        id: 'techTree',
-        message: 'The Tech Tree allows you to research technologies to improve your civilization. Click the "Tech" button to see available technologies.',
-        target: 'techButton',
+        id: 'combat',
+        message: 'Select your combat units and right-click on enemy units to attack them. Different unit types are effective against different enemies.',
         position: 'bottom',
         actions: [
           {
@@ -172,9 +162,9 @@ export class TutorialManager {
       },
       {
         id: 'minimap',
-        message: 'Use the minimap in the corner to navigate quickly around the battlefield.',
+        message: 'The minimap shows your position in the world. Click on it to quickly navigate to different areas.',
         target: 'minimap',
-        position: 'right',
+        position: 'left',
         actions: [
           {
             text: 'Continue',
@@ -183,15 +173,13 @@ export class TutorialManager {
         ]
       },
       {
-        id: 'tutorial-complete',
-        message: 'Tutorial complete! You now know the basics of the Book of Mormon War RTS. Build your civilization, defeat your enemies, and conquer the promised land!',
+        id: 'completion',
+        message: 'Congratulations! You\'ve completed the tutorial. Defeat all enemy buildings to win the game. Good luck!',
+        position: 'bottom',
         actions: [
           {
-            text: 'Finish Tutorial',
-            callback: () => {
-              this.endTutorial();
-              if (this.completionCallback) this.completionCallback();
-            }
+            text: 'Start Playing',
+            callback: () => this.endTutorial()
           }
         ]
       }
@@ -203,195 +191,238 @@ export class TutorialManager {
    * @param completionCallback Function to call when tutorial is completed
    */
   startTutorial(completionCallback?: () => void) {
-    if (completionCallback) {
-      this.completionCallback = completionCallback;
-    }
+    if (this.tutorialActive) return;
     
     this.tutorialActive = true;
     this.currentStepIndex = -1;
+    this.completionCallback = completionCallback || null;
     
-    // Create tooltip container
-    this.tooltipContainer = this.scene.add.container(0, 0);
-    this.tooltipContainer.setDepth(1000); // Ensure it's on top of everything
+    console.log("Tutorial started");
     
-    // Create highlight graphics
-    this.highlightGraphics = this.scene.add.graphics();
-    this.highlightGraphics.setDepth(999);
-    
-    // Show first step
+    // Start with the first step
     this.nextStep();
-    
-    // Save tutorial state to localStorage
-    localStorage.setItem('tutorialStarted', 'true');
-    
-    console.log('Tutorial started');
   }
 
   /**
    * Advance to the next tutorial step
    */
   nextStep() {
+    // Clean up current step if necessary
+    this.clearTooltip();
+    
+    // Advance to next step
     this.currentStepIndex++;
     
-    // Check if we've reached the end
     if (this.currentStepIndex >= this.steps.length) {
       this.endTutorial();
       return;
     }
     
     const step = this.steps[this.currentStepIndex];
+    console.log(`Tutorial step ${this.currentStepIndex + 1}/${this.steps.length}: ${step.id}`);
     
-    // Clear previous tooltip and highlight
-    this.clearTooltip();
-    
-    // Show new tooltip for this step
+    // Show tooltip for this step
     this.showTooltip(step);
     
-    // Set up completion listener if needed
-    if (step.completeCondition && step.autoAdvance) {
-      const checkCompletionInterval = setInterval(() => {
-        if (step.completeCondition && step.completeCondition()) {
-          clearInterval(checkCompletionInterval);
-          setTimeout(() => this.nextStep(), 1000); // Short delay before advancing
-        }
-      }, 500);
+    // Set up auto-advance if needed
+    if (step.autoAdvance && step.completeCondition) {
+      const checkInterval = this.scene.time.addEvent({
+        delay: 500,
+        callback: () => {
+          if (step.completeCondition && step.completeCondition()) {
+            this.nextStep();
+            checkInterval.remove();
+          }
+        },
+        loop: true
+      });
       
-      // Store the interval so we can clear it if needed
-      this.stepCompletionListeners.set(step.id, () => clearInterval(checkCompletionInterval));
+      // Store reference to remove if step is manually advanced
+      this.stepCompletionListeners.set(step.id, () => checkInterval.remove());
     }
-    
-    console.log(`Tutorial step: ${step.id}`);
   }
 
   /**
    * Show tooltip for the current step
    */
   private showTooltip(step: TutorialStep) {
-    if (!this.tooltipContainer) return;
+    // Create container for tooltip
+    this.tooltipContainer = this.scene.add.container(0, 0);
     
-    // Create tooltip background
-    const tooltipBg = this.scene.add.rectangle(0, 0, 400, 150, 0x000000, 0.8);
-    tooltipBg.setStrokeStyle(2, 0xFFFFFF);
-    tooltipBg.setOrigin(0);
+    // Determine position based on target
+    let x = this.scene.cameras.main.centerX;
+    let y = this.scene.cameras.main.centerY;
     
-    // Create tooltip text
-    this.tooltipText = this.scene.add.text(20, 20, step.message, {
-      fontSize: '16px',
-      color: '#FFFFFF',
-      wordWrap: { width: 360 }
-    });
-    
-    // Add action buttons
-    this.actionButtons = [];
-    if (step.actions && step.actions.length > 0) {
-      let buttonY = this.tooltipText.y + this.tooltipText.height + 20;
-      
-      step.actions.forEach((action, index) => {
-        const buttonX = 200 + (index * 120);
-        const button = this.scene.add.text(buttonX, buttonY, action.text, {
-          fontSize: '16px',
-          color: '#FFFFFF',
-          backgroundColor: '#4A5568',
-          padding: { x: 10, y: 5 }
-        }).setInteractive();
-        
-        button.on('pointerdown', action.callback);
-        button.on('pointerover', () => button.setTint(0xcccccc));
-        button.on('pointerout', () => button.clearTint());
-        
-        this.actionButtons.push(button);
-        this.tooltipContainer?.add(button);
-      });
-      
-      // Adjust tooltip height based on content
-      tooltipBg.height = buttonY + 40;
-    }
-    
-    // Position the tooltip
-    this.positionTooltip(step, tooltipBg);
-    
-    // Add to container
-    this.tooltipContainer.add(tooltipBg);
-    this.tooltipContainer.add(this.tooltipText);
-    
-    // Highlight target if specified
-    if (step.target) {
-      this.highlightTarget(step.target);
-    }
-  }
-
-  /**
-   * Position the tooltip based on the target and specified position
-   */
-  private positionTooltip(step: TutorialStep, tooltipBg: Phaser.GameObjects.Rectangle) {
-    if (!this.tooltipContainer) return;
-    
-    let x = this.scene.cameras.main.width / 2 - 200;
-    let y = this.scene.cameras.main.height / 2 - 75;
-    
-    // If there's a target, position relative to it
+    // If there's a target element, try to position near it
     if (step.target) {
       const targetObject = this.getTargetObject(step.target);
-      
       if (targetObject) {
         const bounds = this.getTargetBounds(targetObject);
         
         // Position based on specified direction
         switch (step.position) {
           case 'top':
-            x = bounds.centerX - 200;
-            y = bounds.top - tooltipBg.height - 10;
+            x = bounds.centerX;
+            y = bounds.top - 20;
             break;
           case 'bottom':
-            x = bounds.centerX - 200;
-            y = bounds.bottom + 10;
+            x = bounds.centerX;
+            y = bounds.bottom + 20;
             break;
           case 'left':
-            x = bounds.left - tooltipBg.width - 10;
-            y = bounds.centerY - tooltipBg.height / 2;
+            x = bounds.left - 20;
+            y = bounds.centerY;
             break;
           case 'right':
-            x = bounds.right + 10;
-            y = bounds.centerY - tooltipBg.height / 2;
+            x = bounds.right + 20;
+            y = bounds.centerY;
             break;
+          default:
+            x = bounds.centerX;
+            y = bounds.bottom + 20;
         }
+        
+        // Highlight the target
+        this.highlightTarget(step.target);
       }
     }
     
-    // Ensure tooltip stays within screen bounds
-    x = Math.max(10, Math.min(x, this.scene.cameras.main.width - tooltipBg.width - 10));
-    y = Math.max(10, Math.min(y, this.scene.cameras.main.height - tooltipBg.height - 10));
+    // Create tooltip background
+    const tooltipWidth = 300;
+    const tooltipHeight = 150;
+    const tooltipBg = this.scene.add.rectangle(
+      0, 0, 
+      tooltipWidth, tooltipHeight, 
+      0x000000, 0.8
+    ).setStrokeStyle(2, 0xffff00);
     
+    // Add message text
+    this.tooltipText = this.scene.add.text(
+      0, -30,
+      step.message,
+      {
+        fontFamily: 'Arial',
+        fontSize: '16px',
+        color: '#ffffff',
+        align: 'center',
+        wordWrap: { width: tooltipWidth - 40 }
+      }
+    ).setOrigin(0.5, 0.5);
+    
+    // Add action buttons if provided
+    this.actionButtons = [];
+    if (step.actions && step.actions.length > 0) {
+      const buttonWidth = 100;
+      const totalWidth = step.actions.length * buttonWidth + (step.actions.length - 1) * 10;
+      const startX = -totalWidth / 2 + buttonWidth / 2;
+      
+      step.actions.forEach((action, index) => {
+        const button = this.scene.add.text(
+          startX + index * (buttonWidth + 10),
+          tooltipHeight / 2 - 30,
+          action.text,
+          {
+            fontFamily: 'Arial',
+            fontSize: '14px',
+            color: '#ffffff',
+            backgroundColor: '#4444aa',
+            padding: { left: 10, right: 10, top: 5, bottom: 5 }
+          }
+        ).setOrigin(0.5, 0.5)
+          .setInteractive({ useHandCursor: true })
+          .on('pointerdown', action.callback);
+          
+        this.actionButtons.push(button);
+      });
+    }
+    
+    // Add components to container
+    this.tooltipContainer.add(tooltipBg);
+    this.tooltipContainer.add(this.tooltipText);
+    this.actionButtons.forEach(button => this.tooltipContainer.add(button));
+    
+    // Position the tooltip
     this.tooltipContainer.setPosition(x, y);
+    
+    // Ensure tooltip is on screen
+    const camera = this.scene.cameras.main;
+    const bounds = this.tooltipContainer.getBounds();
+    
+    if (bounds.left < camera.scrollX) {
+      this.tooltipContainer.x += (camera.scrollX - bounds.left) + 20;
+    } else if (bounds.right > camera.scrollX + camera.width) {
+      this.tooltipContainer.x -= (bounds.right - (camera.scrollX + camera.width)) + 20;
+    }
+    
+    if (bounds.top < camera.scrollY) {
+      this.tooltipContainer.y += (camera.scrollY - bounds.top) + 20;
+    } else if (bounds.bottom > camera.scrollY + camera.height) {
+      this.tooltipContainer.y -= (bounds.bottom - (camera.scrollY + camera.height)) + 20;
+    }
+    
+    // Add fancy animation
+    this.scene.tweens.add({
+      targets: this.tooltipContainer,
+      scaleX: { from: 0.8, to: 1 },
+      scaleY: { from: 0.8, to: 1 },
+      alpha: { from: 0, to: 1 },
+      duration: 300,
+      ease: 'Back.easeOut'
+    });
+  }
+
+  /**
+   * Position the tooltip based on the target and specified position
+   */
+  private positionTooltip(step: TutorialStep, tooltipBg: Phaser.GameObjects.Rectangle) {
+    // This would handle more complex positioning based on the step and target
   }
 
   /**
    * Get the target game object by ID or reference
    */
   private getTargetObject(targetId: string): any {
-    // Try to find the target by ID in various places
-    
-    // Check specific game elements based on ID
+    // For UI elements, this would need to be coordinated with the actual UI implementation
+    // Here's a simplified version:
     switch (targetId) {
-      case 'cityCenter':
-        // Find the player's city center
-        const buildings = (this.scene as any).buildingManager?.getBuildingsByTypeAndPlayer(
-          (this.scene as any).getLocalPlayerId(),
-          'cityCenter'
-        );
-        return buildings && buildings.length > 0 ? buildings[0] : null;
-      
-      case 'techButton':
-        // Reference to the tech button in game UI
-        return (this.scene as any).gameUI?.techButton;
-        
+      case 'resources-display':
+        // Find resource display object
+        return this.scene.children.getByName('resources_panel');
       case 'minimap':
-        // Reference to the minimap
-        return (this.scene as any).minimap;
-        
+        return this.scene.children.getByName('minimap');
+      case 'tech-tree-button':
+        return this.scene.children.getByName('tech_button');
+      case 'worker-unit':
+        // Find a worker unit
+        const unitManager = (this.scene as any).unitManager;
+        if (unitManager) {
+          const playerUnits = unitManager.getUnitsByPlayer((this.scene as any).localPlayerId);
+          return playerUnits.find(unit => unit.type === 'worker');
+        }
+        return null;
+      case 'resource-node':
+        // Find a resource node
+        const mapTiles = (this.scene as any).map;
+        if (mapTiles && mapTiles.length > 0) {
+          for (let y = 0; y < mapTiles.length; y++) {
+            for (let x = 0; x < mapTiles[y].length; x++) {
+              if (mapTiles[y][x].resource) {
+                const resourceKey = `resource_${x}_${y}`;
+                const resourceData = this.scene.registry.get(resourceKey);
+                if (resourceData && resourceData.container) {
+                  return resourceData.container;
+                }
+              }
+            }
+          }
+        }
+        return null;
+      case 'build-button':
+        return this.scene.children.getByName('build_button');
+      case 'train-button':
+        return this.scene.children.getByName('train_button');
       default:
-        // Try to find UI element by ID
-        return document.getElementById(targetId);
+        return null;
     }
   }
 
@@ -399,42 +430,22 @@ export class TutorialManager {
    * Get the bounds of a target object for positioning
    */
   private getTargetBounds(target: any): Phaser.Geom.Rectangle {
-    if (target instanceof Phaser.GameObjects.GameObject) {
-      // For Phaser objects, get their world position
-      const bounds = target.getBounds ? target.getBounds() : { x: 0, y: 0, width: 0, height: 0 };
-      
-      return new Phaser.Geom.Rectangle(
-        bounds.x,
-        bounds.y,
-        bounds.width || 32,
-        bounds.height || 32
-      );
-    } else if (target.x !== undefined && target.y !== undefined) {
-      // For game entities like units/buildings with x,y coordinates
-      return new Phaser.Geom.Rectangle(
-        target.x - (TILE_SIZE / 2),
-        target.y - (TILE_SIZE / 2),
-        TILE_SIZE,
-        TILE_SIZE
-      );
-    } else if (target instanceof HTMLElement) {
-      // For DOM elements, convert their bounds to Phaser coordinate space
-      const rect = target.getBoundingClientRect();
-      
-      return new Phaser.Geom.Rectangle(
-        rect.left,
-        rect.top,
-        rect.width,
-        rect.height
-      );
+    if (!target) return new Phaser.Geom.Rectangle(
+      this.scene.cameras.main.centerX,
+      this.scene.cameras.main.centerY,
+      10, 10
+    );
+    
+    if (target.getBounds) {
+      return target.getBounds();
     }
     
-    // Default bounds in the center of the screen
+    // Fallback for objects without getBounds method
     return new Phaser.Geom.Rectangle(
-      this.scene.cameras.main.width / 2 - 50,
-      this.scene.cameras.main.height / 2 - 50,
-      100,
-      100
+      target.x - (target.width ? target.width / 2 : 25),
+      target.y - (target.height ? target.height / 2 : 25),
+      target.width || 50,
+      target.height || 50
     );
   }
 
@@ -442,78 +453,40 @@ export class TutorialManager {
    * Highlight the target object
    */
   private highlightTarget(targetId: string) {
-    if (!this.highlightGraphics) return;
+    const targetObject = this.getTargetObject(targetId);
+    if (!targetObject) return;
     
-    const target = this.getTargetObject(targetId);
-    if (!target) return;
+    const bounds = this.getTargetBounds(targetObject);
     
-    const bounds = this.getTargetBounds(target);
+    // Create highlight graphics
+    this.highlightGraphics = this.scene.add.graphics();
+    this.highlightGraphics.lineStyle(3, 0xffff00, 0.8);
+    this.highlightGraphics.strokeRect(
+      bounds.x - 5,
+      bounds.y - 5,
+      bounds.width + 10,
+      bounds.height + 10
+    );
     
-    // Clear previous highlight
-    this.highlightGraphics.clear();
+    // Add pulsing animation
+    const timeline = this.scene.tweens.createTimeline();
     
-    // Draw pulsing highlight
-    const pulseTimeline = this.scene.tweens.createTimeline();
-    
-    pulseTimeline.add({
-      targets: { alpha: 0.2 },
-      alpha: 0.8,
+    timeline.add({
+      targets: this.highlightGraphics,
+      alpha: { from: 0.2, to: 1 },
       duration: 500,
-      onUpdate: (tween) => {
-        const target = tween.targets[0];
-        
-        this.highlightGraphics?.clear();
-        this.highlightGraphics?.lineStyle(3, 0xFFFF00, target.alpha);
-        this.highlightGraphics?.strokeRoundedRect(
-          bounds.x - 5,
-          bounds.y - 5,
-          bounds.width + 10,
-          bounds.height + 10,
-          8
-        );
-      },
+      ease: 'Sine.easeInOut',
       yoyo: true,
       repeat: -1
     });
     
-    pulseTimeline.play();
+    timeline.play();
   }
 
   /**
    * Clear the current tooltip and highlight
    */
   private clearTooltip() {
-    if (this.tooltipContainer) {
-      this.tooltipContainer.removeAll(true);
-    }
-    
-    if (this.highlightGraphics) {
-      this.highlightGraphics.clear();
-    }
-    
-    this.actionButtons = [];
-    this.tooltipText = null;
-    
-    // Clear any completion listeners for the current step
-    if (this.currentStepIndex >= 0 && this.currentStepIndex < this.steps.length) {
-      const currentStepId = this.steps[this.currentStepIndex].id;
-      const listener = this.stepCompletionListeners.get(currentStepId);
-      if (listener) {
-        listener();
-        this.stepCompletionListeners.delete(currentStepId);
-      }
-    }
-  }
-
-  /**
-   * End the tutorial sequence
-   */
-  endTutorial() {
-    this.tutorialActive = false;
-    
-    // Clear UI elements
-    this.clearTooltip();
-    
     if (this.tooltipContainer) {
       this.tooltipContainer.destroy();
       this.tooltipContainer = null;
@@ -524,15 +497,33 @@ export class TutorialManager {
       this.highlightGraphics = null;
     }
     
-    // Mark tutorial as completed
-    localStorage.setItem('tutorialCompleted', 'true');
+    this.actionButtons = [];
+    this.tooltipText = null;
     
-    console.log('Tutorial completed');
+    // Remove any auto-advance interval for the current step
+    if (this.currentStepIndex >= 0 && this.currentStepIndex < this.steps.length) {
+      const stepId = this.steps[this.currentStepIndex].id;
+      const cleanupListener = this.stepCompletionListeners.get(stepId);
+      if (cleanupListener) {
+        cleanupListener();
+        this.stepCompletionListeners.delete(stepId);
+      }
+    }
+  }
+
+  /**
+   * End the tutorial sequence
+   */
+  endTutorial() {
+    this.clearTooltip();
+    this.tutorialActive = false;
+    this.currentStepIndex = -1;
     
-    // Call completion callback if exists
     if (this.completionCallback) {
       this.completionCallback();
     }
+    
+    console.log("Tutorial completed");
   }
 
   /**
@@ -569,5 +560,16 @@ export class TutorialManager {
   static resetTutorialState() {
     localStorage.removeItem('tutorialCompleted');
     localStorage.removeItem('tutorialStarted');
+  }
+
+  /**
+   * Update the tutorial manager
+   * @param delta Time since last update
+   */
+  update(delta: number): void {
+    // Use this to implement any continuous updates needed for the tutorial
+    // Such as checking for completion conditions
+    
+    // Currently no continuous updates needed as we use events and timers
   }
 }

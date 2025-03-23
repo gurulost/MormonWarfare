@@ -31,6 +31,7 @@ export class GameScene extends Phaser.Scene {
   private pathfindingManager!: PathfindingManager;
   private combatManager!: CombatManager;
   private techManager!: TechManager;
+  private tutorialManager!: TutorialManager;
   private gameUI!: GameUI;
   private enhancedTechTree!: EnhancedTechTreePanel;
   
@@ -87,6 +88,7 @@ export class GameScene extends Phaser.Scene {
     this.buildingManager = new BuildingManager(this, this.unitManager);
     this.combatManager = new CombatManager(this, this.unitManager);
     this.techManager = new TechManager(this);
+    this.tutorialManager = new TutorialManager(this);
     
     // Generate the map
     this.generateMap();
@@ -129,6 +131,9 @@ export class GameScene extends Phaser.Scene {
       audioStore.backgroundMusic.play().catch(e => console.log("Music play prevented:", e));
     }
     
+    // Check if this is the first time playing and start tutorial if needed
+    this.startTutorialIfFirstTime();
+    
     // Log game start
     console.log("Game started with players:", this.players);
   }
@@ -141,6 +146,7 @@ export class GameScene extends Phaser.Scene {
     this.unitManager.update(delta);
     this.buildingManager.update(delta);
     this.combatManager.update(delta);
+    this.tutorialManager.update(delta);
     
     // Update minimap
     this.updateMinimap();
@@ -1197,6 +1203,27 @@ export class GameScene extends Phaser.Scene {
     
     if (!placed) {
       console.warn(`Could not find a valid location to place ${type} after ${maxAttempts} attempts`);
+    }
+  }
+  
+  /**
+   * Start the tutorial sequence if this is the player's first time playing
+   */
+  private startTutorialIfFirstTime(): void {
+    // Check if this is the first time the player has played
+    const hasTutorialBeenCompleted = localStorage.getItem('tutorialCompleted') === 'true';
+    
+    if (!hasTutorialBeenCompleted) {
+      console.log("Starting first-time tutorial");
+      
+      // Add a slight delay to ensure game elements are initialized
+      this.time.delayedCall(1000, () => {
+        this.tutorialManager.startTutorial(() => {
+          // When tutorial is completed, mark it as done
+          localStorage.setItem('tutorialCompleted', 'true');
+          console.log("Tutorial completed");
+        });
+      });
     }
   }
 }
