@@ -563,11 +563,16 @@ export class GameScene extends Phaser.Scene {
     }
   }
   
+  /**
+   * Updates camera position based on keyboard input and edge scrolling
+   * Zoom functionality is disabled to maintain a fixed camera height
+   * Only panning movement is allowed
+   */
   private updateCameraPosition(delta: number) {
     const camera = this.cameras.main;
     const speed = CAMERA_SPEED * (delta / 16);
     
-    // Keyboard movement
+    // Keyboard movement - only panning (left, right, up, down)
     if (this.cursorKeys.left.isDown) {
       camera.scrollX -= speed;
     } else if (this.cursorKeys.right.isDown) {
@@ -580,7 +585,7 @@ export class GameScene extends Phaser.Scene {
       camera.scrollY += speed;
     }
     
-    // Edge scrolling
+    // Edge scrolling for mouse-based panning
     const pointer = this.input.activePointer;
     
     if (pointer.isDown && !this.isSelecting) {
@@ -854,6 +859,28 @@ export class GameScene extends Phaser.Scene {
       } else {
         console.error("Invalid player data:", player);
       }
+    }
+  }
+  
+  /**
+   * Centers the camera on the local player's city center
+   */
+  private centerCameraOnPlayerCity() {
+    // Find the local player's city center building
+    const localPlayerBuildings = this.buildingManager.getBuildingsByPlayer(this.localPlayerId);
+    const cityCenter = localPlayerBuildings.find(building => building.type === 'cityCenter');
+    
+    if (cityCenter) {
+      console.log("Centering camera on local player's city center", cityCenter.x, cityCenter.y);
+      
+      // Convert from tile coordinates to pixel coordinates
+      const centerX = cityCenter.x * TILE_SIZE + TILE_SIZE / 2;
+      const centerY = cityCenter.y * TILE_SIZE + TILE_SIZE / 2;
+      
+      // Center the camera on the city center
+      this.cameras.main.centerOn(centerX, centerY);
+    } else {
+      console.warn("Could not find local player's city center for camera centering");
     }
   }
   
