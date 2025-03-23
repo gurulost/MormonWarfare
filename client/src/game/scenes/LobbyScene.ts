@@ -218,6 +218,9 @@ export class LobbyScene extends Phaser.Scene {
     // Add elements to container
     container.add([bg, titleText, descText]);
     
+    // Set size for the container to make it interactive
+    container.setSize(220, 100);
+    
     return container;
   }
   
@@ -318,16 +321,13 @@ export class LobbyScene extends Phaser.Scene {
     multiplayerStore.joinRoom(this.roomCode);
     
     // Listen for player updates from the store
-    useMultiplayer.subscribe(
-      state => state.players,
-      (players) => {
-        if (players.length > 0) {
-          this.players = players;
-          this.createPlayerList();
-          this.updateStartButtonState();
-        }
+    useMultiplayer.subscribe((state) => {
+      if (state.players.length > 0) {
+        this.players = state.players;
+        this.createPlayerList();
+        this.updateStartButtonState();
       }
-    );
+    });
   }
   
   private addFakePlayersForDemo() {
