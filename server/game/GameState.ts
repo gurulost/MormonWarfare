@@ -63,19 +63,50 @@ export class GameState {
   }
   
   private handleUnitMove(event: GameEvent): boolean {
-    const { unitIds, targetX, targetY } = event;
+    const { unitIds, targetX, targetY, actionId, timestamp } = event;
     
     // Validate target position
     if (
       !this.isValidPosition(targetX, targetY) ||
       !this.isWalkable(targetX, targetY)
     ) {
+      console.warn(`Invalid movement target: (${targetX}, ${targetY})`);
       return false;
     }
     
-    // In a full implementation, this would update unit positions
-    // For now, just return true to indicate success
-    return true;
+    // Validate units exist
+    if (!unitIds || !Array.isArray(unitIds) || unitIds.length === 0) {
+      console.warn('No valid unit IDs provided for movement');
+      return false;
+    }
+    
+    // Update unit paths
+    let allUnitsValid = true;
+    for (const unitId of unitIds) {
+      const unit = this.units.get(unitId);
+      if (!unit) {
+        allUnitsValid = false;
+        console.warn(`Unit ${unitId} not found`);
+        continue;
+      }
+      
+      // Calculate path (in a real implementation, use A* pathfinding)
+      // For now, just set the target directly
+      unit.targetX = targetX;
+      unit.targetY = targetY;
+      
+      // Store prediction information for reconciliation if provided
+      if (actionId) {
+        unit.lastMoveAction = {
+          actionId,
+          timestamp: timestamp || Date.now(),
+          targetX,
+          targetY
+        };
+      }
+    }
+    
+    return allUnitsValid;
   }
   
   private handleUnitCreate(event: GameEvent): boolean {

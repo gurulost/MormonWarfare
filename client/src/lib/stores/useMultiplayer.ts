@@ -520,12 +520,65 @@ function processStateUpdate(changes: any, timestamp: number) {
   state.lastServerTimestamp = timestamp;
   
   // Track which predictions were confirmed by server
-  if (state.pendingActions.length > 0) {
+  if (state.pendingActions.length > 0 && state.serverReconciliation) {
+    // Look for confirmed actions in the server update
+    let actionConfirmations: string[] = [];
+    
+    // Extract unit move confirmations from changes
+    if (changes.units) {
+      Object.values(changes.units).forEach((unit: any) => {
+        if (unit && unit.lastMoveAction && unit.lastMoveAction.actionId) {
+          actionConfirmations.push(unit.lastMoveAction.actionId);
+        }
+      });
+    }
+    
+    // Check for other types of confirmations in the future...
+    
     // Filter out actions that have been confirmed by the server
-    // This is a simplified approach - a real implementation would match action IDs
-    state.pendingActions = state.pendingActions.filter(action => 
-      action.timestamp > timestamp - 500 // Keep only very recent actions
-    );
+    if (actionConfirmations.length > 0) {
+      console.log(`Server confirmed ${actionConfirmations.length} actions`);
+      
+      state.pendingActions = state.pendingActions.filter(action => {
+        // Keep action if it's not in the confirmed list
+        if (action.data && action.data.actionId) {
+          return !actionConfirmations.includes(action.data.actionId);
+        }
+        // For actions without IDs, use time-based filtering as fallback
+        return action.timestamp > timestamp - 500; // Keep only very recent actions
+      });
+    } else {
+      // Fallback to time-based filtering if no explicit confirmations
+      state.pendingActions = state.pendingActions.filter(action => 
+        action.timestamp > timestamp - 500 // Keep only very recent actions
+      );
+    }
+    
+    // If we have remaining pending actions that should be reapplied
+    if (state.pendingActions.length > 0) {
+      console.log(`${state.pendingActions.length} pending actions need to be reapplied after server update`);
+      
+      // Schedule reapplication on next frame to allow state update to complete first
+      setTimeout(() => {
+        const currentState = useMultiplayer.getState();
+        currentState.pendingActions.forEach(action => {
+          console.log(`Reapplying action: ${action.type}`);
+          
+          // Reapply the action based on type
+          if (action.type === "unitMove" && action.data) {
+            notifyGameEventListeners({
+              type: "unitMove",
+              unitIds: action.data.unitIds,
+              targetX: action.data.targetX,
+              targetY: action.data.targetY,
+              isPrediction: true,
+              isReapplied: true
+            });
+          }
+          // Add other action types as needed
+        });
+      }, 0);
+    }
   }
   
   // Notify listeners of state update

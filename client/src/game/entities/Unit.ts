@@ -31,6 +31,11 @@ export class Unit {
   carryingResource: { type: 'food' | 'ore', amount: number } | null;
   gatheringEfficiency: number; // Faction-specific bonus
   
+  // Client-side prediction properties
+  isPredicted: boolean = false;
+  predictionSprite: Phaser.GameObjects.Graphics | null = null;
+  lastMoveActionId: string | null = null;
+  
   constructor(
     scene: Phaser.Scene,
     id: string,

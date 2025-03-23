@@ -283,8 +283,19 @@ export class UnitManager {
     unitIds: string[],
     targetX: number,
     targetY: number,
-    fromServer: boolean = false
+    options: {
+      fromServer?: boolean;
+      isPrediction?: boolean;
+      isReapplied?: boolean;
+    } = {}
   ) {
+    const { fromServer = false, isPrediction = false, isReapplied = false } = options;
+    
+    // Log for debugging prediction systems
+    if (isPrediction) {
+      console.log(`Applying ${isReapplied ? 'reapplied' : 'predicted'} unit movement to (${targetX}, ${targetY})`);
+    }
+    
     // Check if target position is valid
     if (targetX < 0 || targetY < 0 || targetX >= MAP_SIZE || targetY >= MAP_SIZE) {
       console.warn(`Target position out of bounds: ${targetX}, ${targetY}`);
@@ -325,6 +336,28 @@ export class UnitManager {
         unit.stopGathering();
         unit.stopAttacking();
         
+        // For prediction, add visual indicator
+        if (isPrediction && !isReapplied) {
+          // Create a visual indicator for predicted movement
+          const predictionMarker = this.scene.add.circle(
+            targetX * TILE_SIZE + TILE_SIZE / 2,
+            targetY * TILE_SIZE + TILE_SIZE / 2,
+            TILE_SIZE / 4,
+            0xFFCC00,
+            0.5
+          );
+          
+          // Fade out and destroy after 1 second
+          this.scene.tweens.add({
+            targets: predictionMarker,
+            alpha: 0,
+            duration: 1000,
+            onComplete: () => {
+              predictionMarker.destroy();
+            }
+          });
+        }
+        
         // Calculate starting position (in grid coordinates)
         const startX = Math.floor(unit.x / TILE_SIZE);
         const startY = Math.floor(unit.y / TILE_SIZE);
@@ -338,13 +371,18 @@ export class UnitManager {
         const path = this.pathfindingManager.findPath(startX, startY, targetX, targetY);
         
         if (path.length > 0) {
+          // Set prediction flag on unit if this is a client prediction
+          if (isPrediction) {
+            unit.isPredicted = true;
+          }
+          
           unit.setPath(path);
         }
       }
     }
     
     // If not from server and units belong to local player, send to server
-    if (!fromServer && unitIds.length > 0) {
+    if (!fromServer && !isPrediction && unitIds.length > 0) {
       const firstUnit = this.units.get(unitIds[0]);
       if (firstUnit && firstUnit.playerId === this.scene.game.registry.get("localPlayerId")) {
         const multiplayerStore = useMultiplayer.getState();
