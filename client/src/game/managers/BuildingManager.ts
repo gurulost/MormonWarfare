@@ -60,7 +60,15 @@ export class BuildingManager {
     y = Math.floor(y);
     
     // Check if tiles are walkable (building needs a 2x2 area)
-    const map = this.scene.game.registry.get("map") || [];
+    let map;
+    
+    // First try to use GameScene's getMap method if available
+    if (typeof (this.scene as any).getMap === 'function') {
+      map = (this.scene as any).getMap();
+    } else {
+      // Fallback to registry
+      map = this.scene.game.registry.get("map") || [];
+    }
     
     // Get size based on building type (2 is default)
     let size = 2;
@@ -106,7 +114,15 @@ export class BuildingManager {
     const building = this.buildings.get(buildingId);
     if (building) {
       // Free up tiles occupied by the building
-      const map = this.scene.game.registry.get("map") || [];
+      let map;
+    
+      // First try to use GameScene's getMap method if available
+      if (typeof (this.scene as any).getMap === 'function') {
+        map = (this.scene as any).getMap();
+      } else {
+        // Fallback to registry
+        map = this.scene.game.registry.get("map") || [];
+      }
       
       // Get building position in grid coordinates
       const x = Math.floor(building.x / TILE_SIZE);
@@ -178,7 +194,15 @@ export class BuildingManager {
       { x: 0, y: -2 }, { x: 1, y: -2 }, { x: 2, y: -2 }, { x: 2, y: -1 }
     ];
     
-    const map = this.scene.game.registry.get("map") || [];
+    let map;
+    
+    // First try to use GameScene's getMap method if available
+    if (typeof (this.scene as any).getMap === 'function') {
+      map = (this.scene as any).getMap();
+    } else {
+      // Fallback to registry
+      map = this.scene.game.registry.get("map") || [];
+    }
     
     for (const offset of spiralOffsets) {
       const x = buildingX + offset.x;

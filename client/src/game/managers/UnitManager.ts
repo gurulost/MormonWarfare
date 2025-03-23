@@ -60,7 +60,16 @@ export class UnitManager {
     y = Math.floor(y);
     
     // Check if tile is walkable
-    const map = this.scene.game.registry.get("map") || [];
+    let map;
+    
+    // First try to use GameScene's getMap method if available
+    if (typeof (this.scene as any).getMap === 'function') {
+      map = (this.scene as any).getMap();
+    } else {
+      // Fallback to registry
+      map = this.scene.game.registry.get("map") || [];
+    }
+    
     if (y >= map.length || x >= map[0].length || !map[y][x].walkable) {
       console.warn(`Cannot create unit at invalid position: ${x}, ${y}`);
       return null;
@@ -180,7 +189,16 @@ export class UnitManager {
     }
     
     // Check if target is walkable
-    const map = this.scene.game.registry.get("map") || [];
+    let map;
+    
+    // First try to use GameScene's getMap method if available
+    if (typeof (this.scene as any).getMap === 'function') {
+      map = (this.scene as any).getMap();
+    } else {
+      // Fallback to registry
+      map = this.scene.game.registry.get("map") || [];
+    }
+    
     if (!map[targetY][targetX].walkable) {
       console.warn(`Target position is not walkable: ${targetX}, ${targetY}`);
       return;
@@ -454,7 +472,16 @@ export class UnitManager {
       return false;
     }
     
-    const map = this.scene.game.registry.get("map") || [];
+    let map;
+    
+    // First try to use GameScene's getMap method if available
+    if (typeof (this.scene as any).getMap === 'function') {
+      map = (this.scene as any).getMap();
+    } else {
+      // Fallback to registry
+      map = this.scene.game.registry.get("map") || [];
+    }
+    
     return map[y][x].walkable;
   }
   
@@ -487,7 +514,16 @@ export class UnitManager {
   
   orderUnitsToGatherResource(unitIds: string[], tileX: number, tileY: number) {
     // Check if tile has a resource
-    const map = this.scene.game.registry.get("map") || [];
+    let map;
+    
+    // First try to use GameScene's getMap method if available
+    if (typeof (this.scene as any).getMap === 'function') {
+      map = (this.scene as any).getMap();
+    } else {
+      // Fallback to registry
+      map = this.scene.game.registry.get("map") || [];
+    }
+    
     if (!map[tileY][tileX].resource) {
       console.warn(`No resource at position: ${tileX}, ${tileY}`);
       return;
@@ -530,7 +566,15 @@ export class UnitManager {
   
   private handleResourceGathering(unit: Unit) {
     // Get map and check if we're at the target resource
-    const map = this.scene.game.registry.get("map") || [];
+    let map;
+    
+    // First try to use GameScene's getMap method if available
+    if (typeof (this.scene as any).getMap === 'function') {
+      map = (this.scene as any).getMap();
+    } else {
+      // Fallback to registry
+      map = this.scene.game.registry.get("map") || [];
+    }
     
     if (!unit.targetResourceX || !unit.targetResourceY) {
       unit.stopGathering();
