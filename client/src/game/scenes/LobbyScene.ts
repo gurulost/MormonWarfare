@@ -6,6 +6,7 @@ export class LobbyScene extends Phaser.Scene {
   private roomCode: string = "";
   private players: { id: string; username: string; faction: FactionType | null; ready: boolean }[] = [];
   private localPlayerIndex: number = -1;
+  private isHosting: boolean = true;
   private roomCodeText!: Phaser.GameObjects.Text;
   private playerListTexts: Phaser.GameObjects.Text[] = [];
   private factionButtons: Phaser.GameObjects.Container[] = [];
@@ -13,9 +14,22 @@ export class LobbyScene extends Phaser.Scene {
   private isReady: boolean = false;
   private startButton!: Phaser.GameObjects.Text;
   private backButton!: Phaser.GameObjects.Text;
+  private copyCodeButton!: Phaser.GameObjects.Text;
   
   constructor() {
     super("LobbyScene");
+  }
+  
+  init(data?: { roomCode?: string }) {
+    // If a room code is provided, we're joining an existing game
+    if (data?.roomCode) {
+      this.roomCode = data.roomCode;
+      this.isHosting = false;
+    } else {
+      // Generate a new room code when hosting
+      this.roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      this.isHosting = true;
+    }
   }
   
   create() {
@@ -27,7 +41,8 @@ export class LobbyScene extends Phaser.Scene {
       .setAlpha(0.8);
     
     // Create title
-    this.add.text(width / 2, 50, "GAME LOBBY", {
+    const titleText = this.isHosting ? "HOST GAME LOBBY" : "JOIN GAME LOBBY";
+    this.add.text(width / 2, 50, titleText, {
       fontFamily: "monospace",
       fontSize: "36px",
       color: "#ffffff",
@@ -35,13 +50,26 @@ export class LobbyScene extends Phaser.Scene {
     }).setOrigin(0.5);
     
     // Create room code display
-    this.roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-    this.roomCodeText = this.add.text(width / 2, 100, `ROOM CODE: ${this.roomCode}`, {
+    this.roomCodeText = this.add.text(width / 2 - 60, 100, `ROOM CODE: ${this.roomCode}`, {
       fontFamily: "monospace",
       fontSize: "24px",
       color: "#ffff00",
       align: "center"
     }).setOrigin(0.5);
+    
+    // Add copy code button
+    this.copyCodeButton = this.add.text(width / 2 + 120, 100, "COPY", {
+      fontFamily: "monospace",
+      fontSize: "18px",
+      color: "#ffffff",
+      backgroundColor: "#444444",
+      padding: { x: 10, y: 5 }
+    })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerover", () => this.copyCodeButton.setStyle({ color: "#ffff00" }))
+      .on("pointerout", () => this.copyCodeButton.setStyle({ color: "#ffffff" }))
+      .on("pointerdown", () => this.copyRoomCode());
     
     // Initialize player list
     const username = "Player" + Math.floor(Math.random() * 1000);
@@ -327,6 +355,41 @@ export class LobbyScene extends Phaser.Scene {
         this.createPlayerList();
         this.updateStartButtonState();
       }
+    });
+  }
+  
+  private copyRoomCode() {
+    // Copy room code to clipboard
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(this.roomCode)
+        .then(() => {
+          this.showMessage("Room code copied to clipboard!");
+        })
+        .catch(err => {
+          console.error('Could not copy code: ', err);
+          this.showMessage("Failed to copy room code", 0xff0000);
+        });
+    } else {
+      this.showMessage("Clipboard not available", 0xff0000);
+    }
+  }
+  
+  private showMessage(text: string, color: number = 0xffffff) {
+    const { width, height } = this.cameras.main;
+    const message = this.add.text(width / 2, height - 70, text, {
+      fontFamily: "monospace",
+      fontSize: "18px",
+      color: color === 0xffffff ? "#ffffff" : "#ff0000",
+      stroke: "#000000",
+      strokeThickness: 2
+    }).setOrigin(0.5);
+    
+    this.tweens.add({
+      targets: message,
+      alpha: 0,
+      duration: 2000,
+      delay: 1500,
+      onComplete: () => message.destroy()
     });
   }
   

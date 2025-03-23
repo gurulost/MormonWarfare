@@ -4,9 +4,12 @@ import { useAudio } from "../../lib/stores/useAudio";
 
 export class MainMenuScene extends Phaser.Scene {
   private title!: Phaser.GameObjects.Text;
-  private playButton!: Phaser.GameObjects.Text;
+  private soloButton!: Phaser.GameObjects.Text;
+  private multiplayerButton!: Phaser.GameObjects.Text;
+  private joinButton!: Phaser.GameObjects.Text;
   private howToPlayButton!: Phaser.GameObjects.Text;
   private musicToggleButton!: Phaser.GameObjects.Text;
+  private roomCodeInput!: Phaser.GameObjects.DOMElement;
   private musicOn: boolean = false;
   
   constructor() {
@@ -39,8 +42,8 @@ export class MainMenuScene extends Phaser.Scene {
       align: "center"
     }).setOrigin(0.5);
     
-    // Create play button
-    this.playButton = this.add.text(width / 2, height / 2, "JOIN MULTIPLAYER GAME", {
+    // Create solo play button
+    this.soloButton = this.add.text(width / 2, height / 2 - 60, "SOLO GAME", {
       fontFamily: "monospace",
       fontSize: "32px",
       color: "#ffffff",
@@ -49,14 +52,66 @@ export class MainMenuScene extends Phaser.Scene {
     })
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true })
-      .on("pointerover", () => this.playButton.setStyle({ color: "#ffff00" }))
-      .on("pointerout", () => this.playButton.setStyle({ color: "#ffffff" }))
+      .on("pointerover", () => this.soloButton.setStyle({ color: "#ffff00" }))
+      .on("pointerout", () => this.soloButton.setStyle({ color: "#ffffff" }))
       .on("pointerdown", () => {
-        this.playButtonClicked();
+        this.soloGameClicked();
       });
     
+    // Create host multiplayer button
+    this.multiplayerButton = this.add.text(width / 2, height / 2, "HOST MULTIPLAYER GAME", {
+      fontFamily: "monospace",
+      fontSize: "28px",
+      color: "#ffffff",
+      backgroundColor: "#4a6c6f",
+      padding: { x: 20, y: 10 }
+    })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerover", () => this.multiplayerButton.setStyle({ color: "#ffff00" }))
+      .on("pointerout", () => this.multiplayerButton.setStyle({ color: "#ffffff" }))
+      .on("pointerdown", () => {
+        this.hostMultiplayerClicked();
+      });
+    
+    // Create join game button
+    this.joinButton = this.add.text(width / 2 + 120, height / 2 + 60, "JOIN GAME", {
+      fontFamily: "monospace",
+      fontSize: "24px",
+      color: "#ffffff",
+      backgroundColor: "#4a6c6f",
+      padding: { x: 15, y: 8 }
+    })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerover", () => this.joinButton.setStyle({ color: "#ffff00" }))
+      .on("pointerout", () => this.joinButton.setStyle({ color: "#ffffff" }))
+      .on("pointerdown", () => {
+        this.joinGameClicked();
+      });
+    
+    // Create input for room code
+    // Add a text label for the room code
+    this.add.text(width / 2 - 140, height / 2 + 60, "ROOM CODE:", {
+      fontFamily: "monospace",
+      fontSize: "20px",
+      color: "#ffffff"
+    }).setOrigin(1, 0.5);
+    
+    // Create HTML input for room code
+    const inputElement = document.createElement('input');
+    inputElement.style.width = '100px';
+    inputElement.style.height = '30px';
+    inputElement.style.fontSize = '18px';
+    inputElement.style.textAlign = 'center';
+    inputElement.style.fontFamily = 'monospace';
+    inputElement.maxLength = 6;
+    
+    this.roomCodeInput = this.add.dom(width / 2 - 80, height / 2 + 60, inputElement)
+      .setOrigin(0, 0.5);
+    
     // Create how to play button
-    this.howToPlayButton = this.add.text(width / 2, height / 2 + 100, "HOW TO PLAY", {
+    this.howToPlayButton = this.add.text(width / 2, height / 2 + 120, "HOW TO PLAY", {
       fontFamily: "monospace",
       fontSize: "24px",
       color: "#ffffff",
@@ -72,7 +127,7 @@ export class MainMenuScene extends Phaser.Scene {
       });
     
     // Create music toggle button
-    this.musicToggleButton = this.add.text(width / 2, height / 2 + 170, "MUSIC: OFF", {
+    this.musicToggleButton = this.add.text(width / 2, height / 2 + 180, "MUSIC: OFF", {
       fontFamily: "monospace",
       fontSize: "20px",
       color: "#dddddd",
@@ -97,9 +152,62 @@ export class MainMenuScene extends Phaser.Scene {
     this.initializeBackgroundMusic();
   }
   
-  private playButtonClicked() {
-    console.log("Play button clicked");
+  private soloGameClicked() {
+    console.log("Solo game selected");
+    // Create a solo game with an AI opponent
+    this.startSoloGame();
+  }
+  
+  private hostMultiplayerClicked() {
+    console.log("Host multiplayer game selected");
     this.scene.start("LobbyScene");
+  }
+  
+  private joinGameClicked() {
+    const inputElement = this.roomCodeInput.getChildByName('input') as HTMLInputElement;
+    const roomCode = inputElement ? inputElement.value.toUpperCase() : '';
+    
+    if (roomCode && roomCode.length === 6) {
+      console.log(`Joining game with room code: ${roomCode}`);
+      this.scene.start("LobbyScene", { roomCode });
+    } else {
+      // Show error message for invalid room code
+      this.showMessage("Please enter a valid 6-character room code", 0xff0000);
+    }
+  }
+  
+  private showMessage(text: string, color: number = 0xffffff) {
+    const { width, height } = this.cameras.main;
+    const message = this.add.text(width / 2, height - 100, text, {
+      fontFamily: "monospace",
+      fontSize: "20px",
+      color: color === 0xffffff ? "#ffffff" : "#ff0000",
+      stroke: "#000000",
+      strokeThickness: 3
+    }).setOrigin(0.5);
+    
+    this.tweens.add({
+      targets: message,
+      alpha: 0,
+      duration: 2000,
+      delay: 1500,
+      onComplete: () => message.destroy()
+    });
+  }
+  
+  private startSoloGame() {
+    // Create a game with the player as Nephites and AI as Lamanites
+    const gameData = {
+      players: [
+        { id: "local", username: "Player", faction: "Nephites", ready: true },
+        { id: "ai", username: "AI Opponent", faction: "Lamanites", ready: true }
+      ],
+      roomCode: "SOLO",
+      map: "standard"
+    };
+    
+    // Start the game directly
+    this.scene.start("GameScene", { gameData, isSolo: true });
   }
   
   private howToPlayButtonClicked() {

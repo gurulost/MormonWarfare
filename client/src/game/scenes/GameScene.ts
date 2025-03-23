@@ -45,9 +45,12 @@ export class GameScene extends Phaser.Scene {
     super("GameScene");
   }
   
-  init(data: { gameData: GameData }) {
+  init(data: { gameData: GameData, isSolo?: boolean }) {
     this.gameData = data.gameData;
     this.localPlayerId = "local"; // In a real implementation, this would come from the server
+    
+    // Check if this is a solo game
+    const isSoloMode = data.isSolo === true;
     
     // Make sure we only include players with valid factions
     this.players = this.gameData.players
@@ -57,6 +60,12 @@ export class GameScene extends Phaser.Scene {
         username: player.username,
         faction: player.faction as FactionType
       }));
+    
+    // Log game initialization
+    console.log(`Initializing game with ${this.players.length} players. Solo mode: ${isSoloMode}`);
+    this.players.forEach(player => {
+      console.log(`Player: ${player.id}, Faction: ${player.faction}`);
+    });
   }
   
   create() {
