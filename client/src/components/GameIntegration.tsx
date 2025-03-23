@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { GameHUD } from "./ui/gameHUD";
-import { useGame } from "../lib/stores/useGame";
-import { useMultiplayer } from "../lib/stores/useMultiplayer";
-import GameOverlay from "./3d/GameOverlay";
+import { GameHUD } from "@/components/ui/gameHUD";
+import { useGame } from "@/lib/stores/useGame";
+import { useMultiplayer } from "@/lib/stores/useMultiplayer";
+import GameOverlay from "@/components/3d/GameOverlay";
 
 interface GameIntegrationProps {
   gameInstance?: Phaser.Game;

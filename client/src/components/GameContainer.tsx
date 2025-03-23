@@ -1,5 +1,5 @@
 import React from 'react';
-import { GameIntegration } from './GameIntegration';
+import GameIntegration from './GameIntegration';
 
 interface GameContainerProps {
   gameInstance?: Phaser.Game;

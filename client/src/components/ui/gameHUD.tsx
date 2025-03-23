@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useGame } from "../../lib/stores/useGame";
-import { useAudio } from "../../lib/stores/useAudio";
-import { Button } from "./button";
-import { Card } from "./card";
-import { ScrollArea } from "./scroll-area";
-import { Separator } from "./separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./tabs";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./tooltip";
-import { ToggleGroup, ToggleGroupItem } from "./toggle-group";
-import { Badge } from "./badge";
-import { Progress } from "./progress";
-import { Alert, AlertDescription } from "./alert";
+import { useGame } from "@/lib/stores/useGame";
+import { useAudio } from "@/lib/stores/useAudio";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // Icons
 import { 
