@@ -6,6 +6,7 @@ import { BuildingManager } from "../managers/BuildingManager";
 import { PathfindingManager } from "../managers/PathfindingManager";
 import { CombatManager } from "../managers/CombatManager";
 import { TechManager } from "../managers/TechManager";
+import { TutorialManager } from "../managers/TutorialManager";
 import { GameUI } from "../ui/GameUI";
 import { EnhancedTechTreePanel } from "../ui/EnhancedTechTreePanel";
 import { useMultiplayer } from "../../lib/stores/useMultiplayer";
