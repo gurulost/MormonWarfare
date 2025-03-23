@@ -1,0 +1,287 @@
+import Phaser from "phaser";
+import { BuildingType, FactionType } from "../types";
+import { TILE_SIZE } from "../config";
+
+export class Building {
+  id: string;
+  type: BuildingType;
+  playerId: string;
+  faction: FactionType;
+  health: number;
+  maxHealth: number;
+  defense: number;
+  x: number;
+  y: number;
+  sprite: Phaser.GameObjects.Container;
+  healthBar: Phaser.GameObjects.Rectangle;
+  selected: boolean;
+  productionProgress: number;
+  productionTime: number;
+  isProducing: boolean;
+  productionQueue: { type: string; remainingTime: number }[];
+  size: number;
+  
+  constructor(
+    scene: Phaser.Scene,
+    id: string,
+    type: BuildingType,
+    playerId: string,
+    faction: FactionType,
+    x: number,
+    y: number
+  ) {
+    this.id = id;
+    this.type = type;
+    this.playerId = playerId;
+    this.faction = faction;
+    this.x = x * TILE_SIZE + TILE_SIZE / 2;
+    this.y = y * TILE_SIZE + TILE_SIZE / 2;
+    this.selected = false;
+    this.productionProgress = 0;
+    this.productionTime = 0;
+    this.isProducing = false;
+    this.productionQueue = [];
+    
+    // Set building stats based on type
+    const stats = this.getBuildingStats();
+    this.health = stats.health;
+    this.maxHealth = stats.health;
+    this.defense = stats.defense;
+    this.size = stats.size;
+    
+    // Create sprite
+    this.sprite = this.createSprite(scene);
+    
+    // Create health bar
+    const healthBarBg = scene.add.rectangle(0, -this.size * 10 - 10, this.size * 20, 8, 0x000000);
+    this.healthBar = scene.add.rectangle(-this.size * 10, -this.size * 10 - 10, this.size * 20, 8, 0x00ff00)
+      .setOrigin(0, 0);
+    
+    // Add components to container
+    this.sprite.add([healthBarBg, this.healthBar]);
+  }
+  
+  private createSprite(scene: Phaser.Scene): Phaser.GameObjects.Container {
+    const container = scene.add.container(this.x, this.y);
+    
+    // Determine color based on player and building type
+    let colorMain = 0x0000ff; // Default blue for Nephites
+    let colorSecondary = 0xaaaaff;
+    
+    if (this.faction === "Lamanites") {
+      colorMain = 0xff0000; // Red for Lamanites
+      colorSecondary = 0xffaaaa;
+    }
+    
+    // Draw different shapes based on building type
+    let buildingShape: Phaser.GameObjects.Shape;
+    let buildingText: Phaser.GameObjects.Text;
+    
+    if (this.type === "cityCenter") {
+      // City center is a large square
+      buildingShape = scene.add.rectangle(0, 0, this.size * 20, this.size * 20, colorMain);
+      buildingText = scene.add.text(0, 0, "CITY", {
+        fontFamily: "monospace",
+        fontSize: "14px",
+        color: "#ffffff"
+      }).setOrigin(0.5);
+    } else if (this.type === "barracks") {
+      // Barracks is a rectangle
+      buildingShape = scene.add.rectangle(0, 0, this.size * 20, this.size * 15, colorMain);
+      buildingText = scene.add.text(0, 0, "BRK", {
+        fontFamily: "monospace",
+        fontSize: "14px",
+        color: "#ffffff"
+      }).setOrigin(0.5);
+    } else if (this.type === "archeryRange") {
+      // Archery range is a pentagon
+      const radius = this.size * 10;
+      buildingShape = scene.add.polygon(0, 0, [
+        { x: 0, y: -radius },
+        { x: radius * 0.95, y: -radius * 0.3 },
+        { x: radius * 0.58, y: radius * 0.8 },
+        { x: -radius * 0.58, y: radius * 0.8 },
+        { x: -radius * 0.95, y: -radius * 0.3 }
+      ], colorMain);
+      buildingText = scene.add.text(0, 0, "ARC", {
+        fontFamily: "monospace",
+        fontSize: "14px",
+        color: "#ffffff"
+      }).setOrigin(0.5);
+    } else {
+      // Generic building shape for other types
+      buildingShape = scene.add.rectangle(0, 0, this.size * 20, this.size * 20, colorMain);
+      buildingText = scene.add.text(0, 0, "BLD", {
+        fontFamily: "monospace",
+        fontSize: "14px",
+        color: "#ffffff"
+      }).setOrigin(0.5);
+    }
+    
+    // Selection indicator (hidden by default)
+    const selectionRect = scene.add.rectangle(
+      0, 0, 
+      this.size * 25, 
+      this.size * 25, 
+      0xffff00, 0
+    ).setStrokeStyle(2, 0xffff00);
+    
+    // Add everything to the container
+    container.add([buildingShape, buildingText, selectionRect]);
+    
+    return container;
+  }
+  
+  private getBuildingStats() {
+    let stats = {
+      health: 500,
+      defense: 10,
+      size: 2
+    };
+    
+    // Stats by building type
+    if (this.type === "cityCenter") {
+      stats = {
+        health: 1000,
+        defense: 15,
+        size: 3
+      };
+    } else if (this.type === "barracks") {
+      stats = {
+        health: 600,
+        defense: 12,
+        size: 2
+      };
+    } else if (this.type === "archeryRange") {
+      stats = {
+        health: 500,
+        defense: 8,
+        size: 2
+      };
+    } else if (this.type === "wall") {
+      stats = {
+        health: 800,
+        defense: 20,
+        size: 1
+      };
+    }
+    
+    // Apply faction bonuses
+    if (this.faction === "Nephites") {
+      // Nephites have stronger buildings
+      stats.defense += 5;
+      if (this.type === "wall") {
+        // Nephites excel at defense
+        stats.health += 200;
+      }
+    }
+    
+    return stats;
+  }
+  
+  update(delta: number) {
+    // Update health bar
+    const healthPercent = this.health / this.maxHealth;
+    this.healthBar.width = this.size * 20 * healthPercent;
+    this.healthBar.fillColor = healthPercent > 0.5 ? 0x00ff00 : 0xff0000;
+    
+    // Update selection indicator
+    const selectionRect = this.sprite.getAt(2) as Phaser.GameObjects.Shape;
+    selectionRect.setVisible(this.selected);
+    
+    // Update production
+    if (this.isProducing && this.productionQueue.length > 0) {
+      const currentProduction = this.productionQueue[0];
+      currentProduction.remainingTime -= delta;
+      
+      // Update production progress
+      this.productionProgress = 1 - (currentProduction.remainingTime / this.productionTime);
+      
+      // Check if production completed
+      if (currentProduction.remainingTime <= 0) {
+        const producedType = currentProduction.type;
+        this.productionQueue.shift();
+        
+        // If queue is empty, stop producing
+        if (this.productionQueue.length === 0) {
+          this.isProducing = false;
+        } else {
+          // Start the next item in queue
+          this.productionTime = this.getProductionTime(this.productionQueue[0].type);
+        }
+        
+        return producedType; // Return the produced item
+      }
+    }
+    
+    return null; // Nothing produced this update
+  }
+  
+  setSelected(selected: boolean) {
+    this.selected = selected;
+  }
+  
+  takeDamage(amount: number) {
+    this.health -= Math.max(1, amount - this.defense / 2);
+    
+    // Check if building destroyed
+    if (this.health <= 0) {
+      return true; // Building destroyed
+    }
+    return false; // Building still standing
+  }
+  
+  queueProduction(type: string) {
+    // Initialize production time
+    const productionTime = this.getProductionTime(type);
+    
+    // Add to production queue
+    this.productionQueue.push({
+      type,
+      remainingTime: productionTime
+    });
+    
+    // If not already producing, start production
+    if (!this.isProducing) {
+      this.isProducing = true;
+      this.productionTime = productionTime;
+    }
+  }
+  
+  getProductionTime(type: string): number {
+    // Time in milliseconds
+    switch (type) {
+      case "worker":
+        return 10000; // 10 seconds
+      case "melee":
+        return 15000; // 15 seconds
+      case "ranged":
+        return 20000; // 20 seconds
+      default:
+        return 10000;
+    }
+  }
+  
+  cancelProduction(index: number) {
+    if (index < this.productionQueue.length) {
+      // Remove from queue
+      this.productionQueue.splice(index, 1);
+      
+      // If queue is now empty, stop producing
+      if (this.productionQueue.length === 0) {
+        this.isProducing = false;
+      } else if (index === 0) {
+        // If we removed the currently producing item, update to the next one
+        this.productionTime = this.getProductionTime(this.productionQueue[0].type);
+      }
+    }
+  }
+  
+  getProductionQueue() {
+    return this.productionQueue;
+  }
+  
+  getProductionProgress() {
+    return this.productionProgress;
+  }
+}

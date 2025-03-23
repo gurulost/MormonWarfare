@@ -1,0 +1,187 @@
+import Phaser from "phaser";
+import { useMultiplayer } from "../../lib/stores/useMultiplayer";
+import { useAudio } from "../../lib/stores/useAudio";
+
+export class MainMenuScene extends Phaser.Scene {
+  private title!: Phaser.GameObjects.Text;
+  private playButton!: Phaser.GameObjects.Text;
+  private howToPlayButton!: Phaser.GameObjects.Text;
+  private musicToggleButton!: Phaser.GameObjects.Text;
+  private musicOn: boolean = false;
+  
+  constructor() {
+    super("MainMenuScene");
+  }
+
+  create() {
+    const { width, height } = this.cameras.main;
+    
+    // Set background
+    this.add.rectangle(0, 0, width, height, 0x000000)
+      .setOrigin(0, 0)
+      .setAlpha(0.7);
+    
+    // Create title text
+    this.title = this.add.text(width / 2, height / 5, "BATTLES OF THE COVENANT", {
+      fontFamily: "monospace",
+      fontSize: "48px",
+      color: "#ffffff",
+      stroke: "#000000",
+      strokeThickness: 6,
+      align: "center"
+    }).setOrigin(0.5);
+    
+    // Create subtitle
+    this.add.text(width / 2, height / 5 + 60, "A Book of Mormon RTS Game", {
+      fontFamily: "monospace",
+      fontSize: "24px",
+      color: "#eeeeee",
+      align: "center"
+    }).setOrigin(0.5);
+    
+    // Create play button
+    this.playButton = this.add.text(width / 2, height / 2, "JOIN MULTIPLAYER GAME", {
+      fontFamily: "monospace",
+      fontSize: "32px",
+      color: "#ffffff",
+      backgroundColor: "#4a6c6f",
+      padding: { x: 20, y: 10 }
+    })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerover", () => this.playButton.setStyle({ color: "#ffff00" }))
+      .on("pointerout", () => this.playButton.setStyle({ color: "#ffffff" }))
+      .on("pointerdown", () => {
+        this.playButtonClicked();
+      });
+    
+    // Create how to play button
+    this.howToPlayButton = this.add.text(width / 2, height / 2 + 100, "HOW TO PLAY", {
+      fontFamily: "monospace",
+      fontSize: "24px",
+      color: "#ffffff",
+      backgroundColor: "#4a6c6f",
+      padding: { x: 15, y: 8 }
+    })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerover", () => this.howToPlayButton.setStyle({ color: "#ffff00" }))
+      .on("pointerout", () => this.howToPlayButton.setStyle({ color: "#ffffff" }))
+      .on("pointerdown", () => {
+        this.howToPlayButtonClicked();
+      });
+    
+    // Create music toggle button
+    this.musicToggleButton = this.add.text(width / 2, height / 2 + 170, "MUSIC: OFF", {
+      fontFamily: "monospace",
+      fontSize: "20px",
+      color: "#dddddd",
+      padding: { x: 10, y: 5 }
+    })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerover", () => this.musicToggleButton.setStyle({ color: "#ffff00" }))
+      .on("pointerout", () => this.musicToggleButton.setStyle({ color: "#dddddd" }))
+      .on("pointerdown", () => {
+        this.toggleMusic();
+      });
+    
+    // Credits text
+    this.add.text(width / 2, height - 50, "Based on Book of Mormon War Chapters", {
+      fontFamily: "monospace",
+      fontSize: "16px",
+      color: "#aaaaaa"
+    }).setOrigin(0.5);
+    
+    // Initialize background music
+    this.initializeBackgroundMusic();
+  }
+  
+  private playButtonClicked() {
+    console.log("Play button clicked");
+    this.scene.start("LobbyScene");
+  }
+  
+  private howToPlayButtonClicked() {
+    console.log("How to Play button clicked");
+    
+    // Create a semi-transparent background for the instructions
+    const { width, height } = this.cameras.main;
+    const overlay = this.add.rectangle(0, 0, width, height, 0x000000, 0.8)
+      .setOrigin(0)
+      .setInteractive();
+    
+    // Instructions text
+    const instructions = [
+      "HOW TO PLAY",
+      "",
+      "1. Gather resources (Food and Ore) using Worker units",
+      "2. Build structures to produce more units",
+      "3. Train military units to defend and attack",
+      "4. Upgrade your technology to unlock stronger units",
+      "5. Defeat your opponents by destroying their City Center",
+      "",
+      "CONTROLS:",
+      "- Left-click to select units",
+      "- Right-click to move selected units",
+      "- Drag to select multiple units",
+      "- Use the UI to build structures and train units"
+    ];
+    
+    const instructionsText = this.add.text(width / 2, height / 2, instructions, {
+      fontFamily: "monospace",
+      fontSize: "20px",
+      color: "#ffffff",
+      align: "center",
+      lineSpacing: 10
+    }).setOrigin(0.5);
+    
+    // Close button
+    const closeButton = this.add.text(width / 2, height - 100, "CLOSE", {
+      fontFamily: "monospace",
+      fontSize: "24px",
+      color: "#ffffff",
+      backgroundColor: "#aa3333",
+      padding: { x: 15, y: 8 }
+    })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerdown", () => {
+        overlay.destroy();
+        instructionsText.destroy();
+        closeButton.destroy();
+      });
+  }
+  
+  private initializeBackgroundMusic() {
+    // Get the HTML audio element
+    const musicElement = document.getElementById("background-music") as HTMLAudioElement;
+    const hitSoundElement = document.getElementById("hit-sound") as HTMLAudioElement;
+    const successSoundElement = document.getElementById("success-sound") as HTMLAudioElement;
+    
+    // Set up the audio store
+    const audioStore = useAudio.getState();
+    audioStore.setBackgroundMusic(musicElement);
+    audioStore.setHitSound(hitSoundElement);
+    audioStore.setSuccessSound(successSoundElement);
+  }
+  
+  private toggleMusic() {
+    const audioStore = useAudio.getState();
+    audioStore.toggleMute();
+    
+    // Update button text
+    this.musicOn = !this.musicOn;
+    this.musicToggleButton.setText(`MUSIC: ${this.musicOn ? "ON" : "OFF"}`);
+    
+    // Play or pause background music
+    const backgroundMusic = audioStore.backgroundMusic;
+    if (backgroundMusic) {
+      if (this.musicOn) {
+        backgroundMusic.play().catch(e => console.log("Music play prevented:", e));
+      } else {
+        backgroundMusic.pause();
+      }
+    }
+  }
+}

@@ -1,0 +1,230 @@
+Book of Mormon War RTS – Game Design Document
+
+1. OVERVIEW & CONCEPT
+
+Game Title (Working Title):
+Battles of the Covenant
+
+Core Concept:
+Players lead factions drawn from the Book of Mormon War Chapters—such as the Nephites, Lamanites, and optionally others—to engage in real-time strategic warfare. The game combines accessible, fast-paced RTS gameplay with simplified progression mechanics and compact map design inspired by The Battle of Polytopia. While still set in an ancient, scripturally inspired world, the game emphasizes clear faction differences, tactical resource management, and strategic depth in a multiplayer environment.
+
+Key Inspirations:
+	•	Streamlined Tech Progression: Like Polytopia’s concise tech tree, players unlock critical upgrades and unit types gradually without overwhelming complexity.
+	•	Unique Faction Advantages: Each faction begins with a distinct bonus reflecting its historical and thematic strengths.
+	•	Compact, Engaging Maps: Smaller maps encourage early encounters and strategic skirmishes, ensuring continuous action.
+	•	Terrain and Resource Tactics: Incorporate terrain effects and limited resources to force meaningful decisions.
+
+⸻
+
+2. TECH STACK & PLATFORM
+
+Frontend:
+	•	JavaScript with Phaser.js for 2D rendering, sprite management, and game logic.
+	•	HTML5 Canvas/WebGL: Phaser.js’s underlying technology to enable smooth graphics and animations.
+
+Backend/Multiplayer:
+	•	Node.js paired with Socket.io for real-time, server-authoritative multiplayer functionality.
+	•	Hosting: Deploy on a Node.js–friendly platform (Heroku, AWS, etc.) with scalability in mind.
+
+Rationale:
+	•	Phaser.js is well documented, LLM-friendly, and ideal for rapid prototyping of 2D RTS gameplay.
+	•	Node.js with Socket.io offers straightforward, low-latency multiplayer integration.
+
+⸻
+
+3. CORE GAMEPLAY & FEATURES
+
+3.1 Factions & Unique Starting Conditions
+	•	Nephites:
+	•	Bonus: Begin with an early unlock for defensive fortifications and balanced unit costs.
+	•	Theme: Versatile forces with both melee and ranged capabilities.
+	•	Lamanites:
+	•	Bonus: Start with stronger melee units or an initial surplus of resources for unit production.
+	•	Theme: Aggressive, robust infantry focused on direct combat.
+	•	Optional Factions (e.g., Zoramites):
+	•	Bonus: Specialized economic bonuses (e.g., faster resource gathering) or unique unit types.
+
+Inspired by Polytopia’s diverse tribes, each faction’s early advantages will steer player strategy from the outset.
+
+3.2 Simplified Tech Tree & Progression
+	•	Tech Tree Overview:
+	•	A pared-down progression system that unlocks new unit types, building upgrades, and special abilities.
+	•	Each faction’s tech tree is thematically linked to its historical strengths (e.g., fortification upgrades for Nephites, combat enhancements for Lamanites).
+	•	Progression Benefits:
+	•	Keeps players engaged without overcomplicating decisions.
+	•	Encourages replayability as players experiment with different faction paths.
+
+3.3 Map & Terrain Design
+	•	Map Layout:
+	•	Compact, top-down 2D tile maps (e.g., 50×50 tiles) that foster early conflict and strategic maneuvering.
+	•	Terrain Features:
+	•	Varied terrain such as grasslands, forests, and hills.
+	•	Strategic Elements:
+	•	Defensive Bonuses: Forests or high ground offer modest defensive buffs.
+	•	Movement Impact: Some terrain may slow unit movement, forcing tactical planning.
+	•	Resource Nodes:
+	•	Limited strategic resource nodes (e.g., “Food” from farmland and “Ore” from quarries/mines) to regulate expansion and force resource-management decisions.
+
+3.4 Economy & Base Building
+	•	Resource Management:
+	•	Workers: Basic units to gather resources, construct buildings, and repair structures.
+	•	Resource Allocation: Players must balance between unit production, building defenses, and tech upgrades.
+	•	Key Structures:
+	•	City Center (Town/Temple):
+	•	Acts as the primary building, unit production hub, and resource storage.
+	•	Barracks/Training Grounds:
+	•	Produces melee and/or ranged units, themed appropriately (e.g., “Moroni’s Barracks”).
+	•	Special Buildings:
+	•	Optionally include structures that unlock tech upgrades or special abilities (mirroring the tech tree’s progression).
+
+3.5 Units & Combat
+	•	Unit Types:
+	•	Workers: Basic but essential; gather resources and construct buildings.
+	•	Melee Soldiers: Frontline units for close combat.
+	•	Ranged Soldiers: Units that attack from a distance.
+	•	Hero Units (Optional): Scripturally inspired leaders (e.g., Captain Moroni) with unique abilities.
+	•	Combat Mechanics:
+	•	Simple “click-to-move, click-to-attack” controls.
+	•	Incorporate basic pathfinding (via Phaser’s built-in systems or a grid-based approach) to manage unit movement.
+	•	Terrain modifiers (from section 3.3) affect combat effectiveness.
+
+⸻
+
+4. MULTIPLAYER ARCHITECTURE
+
+4.1 Core Multiplayer Framework
+	•	Server Authority:
+	•	The Node.js server maintains the authoritative game state (unit positions, resource counts, health values).
+	•	Real-Time Communication:
+	•	Use Socket.io for low-latency, real-time command and state updates.
+	•	Commands include unit movement, resource collection, building construction, and combat actions.
+
+4.2 Matchmaking & Lobby
+	•	Lobby System:
+	•	Simple interface for players to join or create matches (2–4 players per game).
+	•	Real-Time Updates:
+	•	The server periodically broadcasts game state (e.g., 10–20 updates per second) or uses event-based triggers to ensure synchronization.
+
+4.3 Lag Mitigation
+	•	Simplified Network Code:
+	•	Rely on server-side validation of moves and minimal latency compensation for an MVP.
+	•	Error Handling:
+	•	Basic anti-cheat and sanity checks on client commands to prevent desynchronization.
+
+⸻
+
+5. GAME LOOP & PROGRESSION
+	1.	Initialization:
+	•	Players begin with a City Center, a few workers, and minimal resources.
+	•	Each faction’s unique bonus is activated at the start.
+	2.	Early Game:
+	•	Resource gathering and initial expansion.
+	•	Deployment of workers for resource collection and basic defensive structures.
+	3.	Mid Game:
+	•	Unlocking early tech upgrades via a simplified tech tree.
+	•	Production of specialized units and early skirmishes on a compact map.
+	4.	Late Game:
+	•	Intensified combat and strategic positioning—use of terrain and faction-specific upgrades become crucial.
+	•	Win conditions trigger when a faction’s primary City Center is destroyed or a key strategic point is captured.
+	5.	Victory Conditions:
+	•	Primary: Destruction of opponent’s City Center.
+	•	Optional secondary victory conditions (e.g., capturing “holy sites” linked to scriptural narratives).
+
+⸻
+
+6. TECHNICAL IMPLEMENTATION DETAILS
+
+6.1 Frontend (Phaser.js)
+	•	Scene Management:
+	•	MainMenuScene: For game creation, joining, and faction selection.
+	•	GameScene: The active battlefield, handling unit rendering, map interactions, and UI.
+	•	Asset Management:
+	•	Load and manage sprite atlases for workers, soldiers, buildings, and terrain tiles.
+	•	Camera & UI:
+	•	Enable basic panning and zooming to allow players to survey the compact battlefield.
+
+6.2 Backend (Node.js & Socket.io)
+	•	Server Loop:
+	•	Maintain the game’s authoritative state, process player commands, and resolve combat interactions.
+	•	Data Structures:
+	•	Maintain arrays or objects for players, units, and buildings, each with associated attributes (position, health, faction, etc.).
+	•	Networking Events:
+	•	"joinGame", "playerCommand", "stateUpdate": Ensure all player actions are processed server-side and updates are broadcast to clients.
+
+6.3 Pathfinding & Collision
+	•	Pathfinding:
+	•	Implement a grid-based or simple node-to-node system sufficient for the compact maps envisioned.
+	•	Collision Detection:
+	•	Basic collision handling to prevent unit overlap and ensure smooth movement.
+
+6.4 Security & Integrity
+	•	Server-Authoritative Model:
+	•	Validate all incoming commands on the server.
+	•	Basic Anti-Cheat Measures:
+	•	Sanity checks on unit movement and resource collection.
+
+⸻
+
+7. ART, AUDIO, & THEMATIC ASSETS
+
+Visual Style:
+	•	2D pixel or stylized cartoon graphics that evoke the ancient American setting of the Book of Mormon.
+	•	Distinct sprites for each faction’s units and structures (e.g., “Moroni’s Barracks,” “Lamanite Encampment”).
+
+Audio:
+	•	Background music and sound effects that draw on period-inspired themes.
+	•	Unique audio cues for building, combat, and resource collection.
+
+Narrative Elements:
+	•	Use scriptural references and thematic text (e.g., mission briefs, faction lore) to reinforce the Book of Mormon setting.
+
+⸻
+
+8. MINIMUM VIABLE PRODUCT (MVP) CHECKLIST
+	•	Map & Environment:
+	•	Single compact map (e.g., 50×50 tiles) with a few resource nodes and varied terrain.
+	•	Factions:
+	•	At least two playable factions (Nephites and Lamanites) with unique starting bonuses.
+	•	Units:
+	•	Basic unit types: workers, melee soldiers, and ranged soldiers.
+	•	Optional hero unit (e.g., Captain Moroni) as a special upgrade.
+	•	Combat & Economy:
+	•	Simple combat mechanics with health, damage, and terrain modifiers.
+	•	A minimal resource system for unit production and building construction.
+	•	Multiplayer:
+	•	Basic lobby and matchmaking for 2–4 players.
+	•	Server-authoritative state management using Node.js and Socket.io.
+	•	Victory Conditions:
+	•	Destruction of the opponent’s City Center (primary) or capture of strategic sites (secondary).
+
+⸻
+
+9. DEVELOPMENT STEPS & TIMELINE
+	1.	Project Initialization:
+	•	Set up the project repository, version control, and basic scaffolding for Phaser.js and Node.js.
+	2.	Single-Player Prototype:
+	•	Develop core gameplay loop: resource gathering, basic unit production, movement, and combat.
+	•	Implement a basic tech tree with a few unlockable upgrades.
+	3.	Multiplayer Integration:
+	•	Integrate Socket.io for real-time multiplayer functionality.
+	•	Develop a simple lobby and match initialization system.
+	4.	Polytopia-Inspired Enhancements:
+	•	Add unique faction starting conditions and a streamlined tech tree.
+	•	Integrate terrain effects and compact map design to encourage early conflict.
+	5.	Polish & Playtesting:
+	•	Refine unit balance, resource management, and combat mechanics.
+	•	Conduct multiplayer tests to address latency, synchronization, and gameplay balance.
+	6.	Post-MVP & Future Updates:
+	•	Expand to include additional factions and units.
+	•	Plan for regular content updates (new tech upgrades, narrative elements, additional maps) to keep the community engaged.
+
+⸻
+
+10. CONFIDENCE & FINAL NOTES
+	•	Overall Plan Feasibility: ~90% confident
+	•	The blend of a simplified tech tree, compact map design, and faction-specific advantages (inspired by The Battle of Polytopia) should create a balanced, engaging experience.
+	•	Potential Challenges:
+	•	Managing network synchronization and pathfinding in real time may require iterative refinement.
+	•	Balancing unique faction strengths while maintaining strategic depth will need careful playtesting.
+
+This document should serve as a clear roadmap for developing a Book of Mormon–themed RTS that is both accessible and strategically engaging, with a unique flavor derived from its scriptural inspirations and modern design influences from games like The Battle of Polytopia.
