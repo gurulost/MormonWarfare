@@ -48,6 +48,9 @@ export function loadAssets(scene: Phaser.Scene) {
   scene.load.audio('background-music', 'sounds/background.mp3');
   scene.load.audio('hit-sound', 'sounds/hit.mp3');
   scene.load.audio('success-sound', 'sounds/success.mp3');
+  scene.load.audio('gatherFood', 'sounds/hit.mp3');  // Reuse hit sound temporarily
+  scene.load.audio('gatherOre', 'sounds/hit.mp3');   // Reuse hit sound temporarily
+  scene.load.audio('deposit', 'sounds/success.mp3'); // Reuse success sound temporarily
 
   // Icons for resources
   createCircleTexture(scene, 'food-icon', 0x22aa22, 8);

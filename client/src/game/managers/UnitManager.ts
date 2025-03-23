@@ -93,7 +93,7 @@ export class UnitManager {
   selectUnitsInBounds(bounds: Phaser.Geom.Rectangle, playerId: string): string[] {
     const selectedUnitIds: string[] = [];
     
-    this.units.forEach(unit => {
+    this.units.forEach((unit: Unit) => {
       // Only select units owned by the player
       if (unit.playerId === playerId) {
         // Check if unit is within selection bounds
@@ -122,7 +122,7 @@ export class UnitManager {
     let closestUnit: Unit | null = null;
     let closestDistance = Infinity;
     
-    this.units.forEach(unit => {
+    this.units.forEach((unit: Unit) => {
       // Only select units owned by the player
       if (unit.playerId === playerId) {
         // Calculate distance to click position
