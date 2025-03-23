@@ -407,6 +407,9 @@ export class Unit {
       selectionCircle.setVisible(this.selected);
     }
     
+    // Update prediction visualization if this unit has predicted movement
+    this.updatePredictionVisual();
+    
     // Add animation for movement
     if (this.isMoving && this.path.length > 0) {
       // Add a slight bobbing motion when moving
@@ -559,5 +562,76 @@ export class Unit {
         this.sprite.angle = 0;
       }
     });
+  }
+  
+  /**
+   * Creates or updates the prediction visualization for this unit
+   * This shows a visual indicator when a unit is in a "predicted" state
+   * waiting for server confirmation
+   */
+  updatePredictionVisual() {
+    // Only create/update if this unit has predicted movement
+    if (this.isPredicted) {
+      // Create prediction graphics if it doesn't exist
+      if (!this.predictionSprite) {
+        this.predictionSprite = this.sprite.scene.add.graphics();
+        // Add the graphics object to the container for proper positioning
+        this.sprite.add(this.predictionSprite);
+      }
+      
+      // Update the prediction visual
+      const time = new Date().getTime();
+      const pulse = (Math.sin(time / 300) + 1) / 2; // Value between 0 and 1
+      
+      this.predictionSprite.clear();
+      
+      // Create a dotted circle around the unit to indicate predicted movement
+      this.predictionSprite.lineStyle(2, 0x00ffff, 0.7 * pulse);
+      
+      // Draw dotted circle
+      const radius = 20;
+      const segments = 16; // Number of segments in the circle
+      const angleStep = (Math.PI * 2) / segments;
+      
+      for (let i = 0; i < segments; i += 2) {
+        const startAngle = i * angleStep;
+        const endAngle = (i + 1) * angleStep;
+        
+        this.predictionSprite.beginPath();
+        this.predictionSprite.arc(0, 0, radius, startAngle, endAngle);
+        this.predictionSprite.strokePath();
+      }
+    } else if (this.predictionSprite) {
+      // Remove prediction visualization when no longer predicted
+      this.predictionSprite.clear();
+      this.predictionSprite.destroy();
+      this.predictionSprite = null;
+    }
+  }
+  
+  /**
+   * Mark this unit as having predicted movement
+   * @param actionId Unique ID for this prediction action
+   */
+  setPredicted(actionId: string) {
+    this.isPredicted = true;
+    this.lastMoveActionId = actionId;
+    // Create the prediction visual immediately
+    this.updatePredictionVisual();
+  }
+  
+  /**
+   * Clear prediction status for this unit
+   */
+  clearPrediction() {
+    this.isPredicted = false;
+    this.lastMoveActionId = null;
+    
+    // Remove prediction visualization
+    if (this.predictionSprite) {
+      this.predictionSprite.clear();
+      this.predictionSprite.destroy();
+      this.predictionSprite = null;
+    }
   }
 }
