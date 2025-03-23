@@ -785,6 +785,56 @@ export class GameState {
     });
   }
 
+  /**
+   * Get all units for validation
+   * @returns Map of all units
+   */
+  getUnits(): Map<string, any> {
+    return this.units;
+  }
+  
+  /**
+   * Get all buildings for validation
+   * @returns Map of all buildings
+   */
+  getBuildings(): Map<string, any> {
+    return this.buildings;
+  }
+  
+  /**
+   * Get unit cost data for validation
+   * @returns Object containing unit costs
+   */
+  getUnitCosts(): { [unitType: string]: { food: number; ore: number } } {
+    const costs: { [unitType: string]: { food: number; ore: number } } = {};
+    
+    // Extract cost information from UNIT_STATS
+    Object.entries(UNIT_STATS).forEach(([unitType, stats]: [string, any]) => {
+      if (stats && stats.cost) {
+        costs[unitType] = stats.cost;
+      }
+    });
+    
+    return costs;
+  }
+  
+  /**
+   * Get building cost data for validation
+   * @returns Object containing building costs
+   */
+  getBuildingCosts(): { [buildingType: string]: { food: number; ore: number } } {
+    const costs: { [buildingType: string]: { food: number; ore: number } } = {};
+    
+    // Extract cost information from BUILDING_STATS
+    Object.entries(BUILDING_STATS).forEach(([buildingType, stats]: [string, any]) => {
+      if (stats && stats.cost) {
+        costs[buildingType] = stats.cost;
+      }
+    });
+    
+    return costs;
+  }
+
   getGameState(): any {
     return {
       players: Object.fromEntries(
