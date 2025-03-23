@@ -164,32 +164,152 @@ export class GameRoom {
   /**
    * Handles an incoming game event, queuing it for batch processing
    */
-  processGameEvent(event: GameEvent): void {
+  processGameEvent(event: GameEvent): boolean {
     if (!this.gameStarted || !this.gameState) {
       console.warn("Cannot process event: game not started");
-      return;
+      return false;
     }
     
-    // Add timestamp to event
-    const timestampedEvent = {
-      ...event,
-      timestamp: Date.now()
-    };
-    
-    // Add to pending events queue
-    this.pendingEvents.push(timestampedEvent);
-    
-    // Process the event immediately for responsive feedback
-    const updatedState = this.gameState.processEvent(event);
-    
-    // Broadcast the event to all players as a responsive update
-    // (State synchronization will happen during tick updates)
-    if (updatedState) {
-      this.broadcastToAll({
-        type: "gameEvent",
-        event: timestampedEvent
+    // Import validation utilities
+    import('../lib/validation')
+      .then(({ validateMapCoordinates, validateEntityOwnership, validateResourceRequirement, createErrorResponse }) => {
+        // Validate event based on type
+        let isValid = true;
+        let validationError = null;
+        
+        // Validate the player exists
+        const player = this.getPlayer(event.playerId);
+        if (!player) {
+          console.warn(`Cannot process event: invalid player ID ${event.playerId}`);
+          return false;
+        }
+        
+        // Player resources
+        const playerResources = player.getResources();
+        
+        // Perform type-specific validation
+        switch (event.type) {
+          case 'unitMove':
+            // Validate coordinates
+            if (!validateMapCoordinates(event.targetX, event.targetY)) {
+              isValid = false;
+              validationError = createErrorResponse(
+                'INVALID_COORDINATES', 
+                `Target coordinates (${event.targetX}, ${event.targetY}) are out of map bounds`
+              );
+            }
+            
+            // Validate unit ownership
+            if (isValid && this.gameState && event.unitIds && event.unitIds.length > 0) {
+              const units = this.gameState.getUnits();
+              if (!validateEntityOwnership(event.unitIds, units, event.playerId)) {
+                isValid = false;
+                validationError = createErrorResponse(
+                  'UNAUTHORIZED_UNITS',
+                  'Player does not own all of the specified units'
+                );
+              }
+            }
+            break;
+            
+          case 'unitCreate':
+            // Validate coordinates
+            if (!validateMapCoordinates(event.x, event.y)) {
+              isValid = false;
+              validationError = createErrorResponse(
+                'INVALID_COORDINATES', 
+                `Spawn coordinates (${event.x}, ${event.y}) are out of map bounds`
+              );
+            }
+            
+            // Validate resources for unit creation (would need unit cost data)
+            if (isValid && event.unitType) {
+              const unitCosts = this.gameState?.getUnitCosts();
+              if (unitCosts && unitCosts[event.unitType]) {
+                const cost = unitCosts[event.unitType];
+                if (!validateResourceRequirement(playerResources, cost.food, cost.ore)) {
+                  isValid = false;
+                  validationError = createErrorResponse(
+                    'INSUFFICIENT_RESOURCES',
+                    `Not enough resources to create ${event.unitType} unit`
+                  );
+                }
+              }
+            }
+            break;
+            
+          case 'buildingCreate':
+            // Similar validation for building creation...
+            if (!validateMapCoordinates(event.x, event.y)) {
+              isValid = false;
+              validationError = createErrorResponse(
+                'INVALID_COORDINATES', 
+                `Building coordinates (${event.x}, ${event.y}) are out of map bounds`
+              );
+            }
+            break;
+            
+          case 'attack':
+            // Validate unit ownership for attackers
+            if (this.gameState && event.attackerIds && event.attackerIds.length > 0) {
+              const units = this.gameState.getUnits();
+              if (!validateEntityOwnership(event.attackerIds, units, event.playerId)) {
+                isValid = false;
+                validationError = createErrorResponse(
+                  'UNAUTHORIZED_UNITS',
+                  'Player does not own all of the attacking units'
+                );
+              }
+            }
+            break;
+            
+          default:
+            // No specific validation for other event types
+            break;
+        }
+        
+        // If validation failed, notify the player
+        if (!isValid) {
+          const playerSocket = this.getPlayerSocket(event.playerId);
+          if (playerSocket && playerSocket.readyState === WebSocket.OPEN) {
+            playerSocket.send(JSON.stringify({
+              type: 'error',
+              error: validationError || 'Invalid game event'
+            }));
+          }
+          return false;
+        }
+        
+        // Add timestamp to event
+        const timestampedEvent = {
+          ...event,
+          timestamp: Date.now()
+        };
+        
+        // Add to pending events queue
+        this.pendingEvents.push(timestampedEvent);
+        
+        // Process the event immediately for responsive feedback
+        const updatedState = this.gameState.processEvent(event);
+        
+        // Broadcast the event to all players as a responsive update
+        // (State synchronization will happen during tick updates)
+        if (updatedState) {
+          this.broadcastToAll({
+            type: "gameEvent",
+            event: timestampedEvent
+          });
+        }
+        
+        return true;
+      })
+      .catch(error => {
+        console.error('Error during event validation:', error);
+        return false;
       });
-    }
+      
+    // Return true for now since the validation happens asynchronously
+    return true;
   }
   
   /**

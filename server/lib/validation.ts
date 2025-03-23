@@ -185,3 +185,63 @@ export function getSchemaForMessageType(type: string, eventType?: string) {
       return null;
   }
 }
+
+/**
+ * Validates that coordinates are within the game map bounds
+ * @param x X coordinate
+ * @param y Y coordinate
+ * @param mapSize Size of the map (default: 50x50)
+ * @returns True if coordinates are valid
+ */
+export function validateMapCoordinates(x: number, y: number, mapSize: number = 50): boolean {
+  return x >= 0 && x < mapSize && y >= 0 && y < mapSize;
+}
+
+/**
+ * Validates that a player has sufficient resources for an action
+ * @param playerResources Current player resources
+ * @param requiredFood Food required for action
+ * @param requiredOre Ore required for action
+ * @returns True if player has sufficient resources
+ */
+export function validateResourceRequirement(
+  playerResources: { food: number; ore: number },
+  requiredFood: number,
+  requiredOre: number
+): boolean {
+  return playerResources.food >= requiredFood && playerResources.ore >= requiredOre;
+}
+
+/**
+ * Validates that the specified entities exist and belong to the player
+ * @param entityIds Array of entity IDs to check
+ * @param entityMap Map of all entities
+ * @param playerId ID of the player
+ * @returns True if all entities exist and belong to the player
+ */
+export function validateEntityOwnership<T extends { playerId: string }>(
+  entityIds: string[],
+  entityMap: Map<string, T>,
+  playerId: string
+): boolean {
+  return entityIds.every(id => {
+    const entity = entityMap.get(id);
+    return entity && entity.playerId === playerId;
+  });
+}
+
+/**
+ * Create an error response with a standardized format
+ * @param code Error code
+ * @param message Error message
+ * @returns Standardized error object
+ */
+export function createErrorResponse(code: string, message: string) {
+  return {
+    success: false,
+    error: {
+      code,
+      message
+    }
+  };
+}
