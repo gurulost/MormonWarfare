@@ -281,14 +281,14 @@ const CameraController = ({
   const [rotationAngle, setRotationAngle] = useState(0);
   const [useOrthographic, setUseOrthographic] = useState(false);
   
-  // Camera boundary constraints
+  // Camera boundary constraints - keep camera within the map boundaries
   const mapBounds = {
     minX: -mapSize * 0.1,
     maxX: mapSize * 1.1,
     minZ: -mapSize * 0.1,
     maxZ: mapSize * 1.1,
-    minY: 2, // Minimum height
-    maxY: mapSize * 1.2 // Maximum height
+    minY: mapSize * 0.6, // Fixed height for RTS view
+    maxY: mapSize * 0.6  // Fixed height for RTS view - same as min to lock
   };
   
   // Handle camera rotation animation and boundaries
@@ -304,8 +304,8 @@ const CameraController = ({
     target.z = Math.max(mapBounds.minZ, Math.min(target.z, mapBounds.maxZ));
     target.y = Math.max(0, Math.min(target.y, 5)); // Limit vertical target to avoid awkward angles
     
-    // Clamp camera height
-    camera.position.y = Math.max(mapBounds.minY, Math.min(camera.position.y, mapBounds.maxY));
+    // Force camera to maintain fixed height - always reset to the specified height
+    camera.position.y = mapBounds.minY; // Use minY which is equal to maxY for fixed height
     
     // Handle rotation animation
     if (cameraRotating) {
@@ -467,18 +467,18 @@ const CameraController = ({
         />
       )}
       
-      {/* Fixed RTS camera controls - only allowing panning and zoom, no rotation */}
+      {/* Fixed RTS camera controls - only allowing panning, no rotation or zoom */}
       <OrbitControls 
         ref={controlsRef}
         target={[mapSize / 2, 0, mapSize / 2]}
         maxPolarAngle={Math.PI / 3} // Fixed angle for RTS view
         minPolarAngle={Math.PI / 3} // Same as max to lock the vertical angle
         enableRotate={false} // Disable rotation completely
-        minDistance={5} // Minimum zoom distance
-        maxDistance={mapSize * 1.2} // Maximum zoom distance
+        enableZoom={false} // Disable zoom functionality
+        minDistance={mapSize * 0.6} // Fixed distance
+        maxDistance={mapSize * 0.6} // Fixed distance
         enableDamping // Smooth movement
         dampingFactor={0.1}
-        zoomSpeed={0.8} // Adjusted zoom speed
         panSpeed={1.0} // Slightly increased pan speed
         screenSpacePanning={true} // More intuitive panning
       />
@@ -517,18 +517,29 @@ export const GameScene = ({
   // UI Controls for camera
   const [showCameraControls, setShowCameraControls] = useState(false);
   
-  // Auto-set strategic view when component loads
+  // Auto-set strategic view and center on main city when component loads
   useEffect(() => {
     // Give a small delay to ensure the component is fully mounted
     const timer = setTimeout(() => {
       if ((window as any).cameraControls) {
+        // Set strategic view first
         (window as any).cameraControls.setStrategicView();
         console.log("Initial strategic view set");
+        
+        // Find city center to focus camera on it
+        const cityCenter = buildings.find(b => b.type === "cityCenter");
+        if (cityCenter) {
+          // Center the camera on the main city
+          (window as any).cameraControls.focusOnPosition(cityCenter.x, 0, cityCenter.y);
+          console.log("Camera centered on main city at position", cityCenter.x, cityCenter.y);
+        } else {
+          console.log("No city center found to focus camera on");
+        }
       }
     }, 500);
     
     return () => clearTimeout(timer);
-  }, []);
+  }, [buildings]);
   
   // Toggle camera control panel
   const toggleCameraControls = () => {
@@ -582,8 +593,8 @@ export const GameScene = ({
       <div 
         style={{
           position: "absolute",
-          top: "20px",
-          right: "20px",
+          top: "80px", // Increased to avoid overlap with top bar
+          right: "80px", // Increased to avoid overlap with toggle button
           zIndex: 100,
           display: "flex",
           flexDirection: "column",
@@ -711,9 +722,9 @@ export const GameScene = ({
               fontSize: "0.8em",
               color: "#ddd"
             }}>
-              <p>Tip: Use mouse wheel to zoom in/out</p>
-              <p>Hold right-click and drag to pan camera</p>
-              <p>Camera angle is fixed for optimal RTS view</p>
+              <p>Tip: Hold right-click and drag to pan camera</p>
+              <p>Camera height and angle are fixed for optimal RTS view</p>
+              <p>Use strategic view for the best game experience</p>
             </div>
           </div>
         )}
