@@ -474,11 +474,21 @@ function processStateUpdate(changes: any, timestamp: number) {
   // Apply delta changes to game state
   const state = useMultiplayer.getState();
   
+  // Calculate latency from server
+  const clientTime = Date.now();
+  const latency = clientTime - timestamp;
+  
+  // Log network health for monitoring
+  if (latency > 200) {
+    console.warn(`High network latency detected: ${latency}ms`);
+  }
+  
   // Notify listeners of state update
   notifyGameEventListeners({
     type: "stateUpdate",
     changes,
-    timestamp
+    timestamp,
+    latency
   });
 }
 
