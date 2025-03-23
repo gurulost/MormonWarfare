@@ -847,22 +847,46 @@ export class GameScene extends Phaser.Scene {
   }
   
   private setupMultiplayerEvents() {
-    // In a real implementation, this would connect to Socket.io events
     const multiplayerStore = useMultiplayer.getState();
     
-    // Listen for unit movement commands
+    // Subscribe to all game events
     multiplayerStore.subscribeToGameEvents((event: any) => {
-      console.log("Received multiplayer event:", event);
+      console.log("Received multiplayer event:", event.type);
       
       // Handle different event types
       if (event.type === 'unitMove') {
-        this.unitManager.moveUnitsTo(event.unitIds, event.targetX, event.targetY, true);
+        // Handle unit movement with prediction support
+        this.unitManager.moveUnitsTo(
+          event.unitIds, 
+          event.targetX, 
+          event.targetY, 
+          { 
+            fromServer: !event.isPrediction, 
+            isPrediction: event.isPrediction,
+            isReapplied: event.isReapplied
+          }
+        );
       } else if (event.type === 'unitCreate') {
-        this.unitManager.createUnit(event.playerId, event.unitType, event.x, event.y, true);
+        this.unitManager.createUnit(
+          event.playerId, 
+          event.unitType, 
+          event.x, 
+          event.y, 
+          true
+        );
       } else if (event.type === 'buildingCreate') {
-        this.buildingManager.createBuilding(event.playerId, event.buildingType, event.x, event.y, true);
+        this.buildingManager.createBuilding(
+          event.playerId, 
+          event.buildingType, 
+          event.x, 
+          event.y, 
+          true
+        );
       } else if (event.type === 'resourceUpdate') {
         this.resourceManager.updateResources(event.playerId, event.resources);
+      } else if (event.type === 'stateUpdate') {
+        // Process state update with reconciliation
+        this.processServerStateUpdate(event.changes, event.timestamp);
       }
     });
   }
@@ -994,8 +1018,94 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     
-    // Move the units
-    this.unitManager.moveUnitsTo(unitIds, targetX, targetY);
+    // Move the units (no prediction settings - this is direct user input)
+    this.unitManager.moveUnitsTo(unitIds, targetX, targetY, {});
+  }
+  
+  /**
+   * Process state updates from the server with reconciliation
+   * @param changes State changes from server
+   * @param timestamp Server timestamp for reconciliation
+   */
+  private processServerStateUpdate(changes: any, timestamp: number): void {
+    if (!changes) return;
+    
+    // Update units based on server state
+    if (changes.units) {
+      Object.entries(changes.units).forEach(([unitId, unitData]: [string, any]) => {
+        const unit = this.unitManager.getUnit(unitId);
+        
+        if (unit) {
+          // If unit was marked as predicted, check if we need to correct its position
+          if (unit.isPredicted) {
+            // Check if the server's position is significantly different
+            const serverX = unitData.x * TILE_SIZE + TILE_SIZE / 2;
+            const serverY = unitData.y * TILE_SIZE + TILE_SIZE / 2;
+            const positionDiff = Phaser.Math.Distance.Between(unit.x, unit.y, serverX, serverY);
+            
+            if (positionDiff > TILE_SIZE / 2) {
+              console.log(`Correcting unit ${unitId} position due to server reconciliation`);
+              
+              // Server position is authoritative - snap to it
+              unit.x = serverX;
+              unit.y = serverY;
+              unit.sprite.setPosition(unit.x, unit.y);
+              
+              // If the unit had a path, update it
+              if (unit.isMoving && 
+                  unitData.targetX !== undefined && 
+                  unitData.targetY !== undefined && 
+                  unitData.targetX !== null && 
+                  unitData.targetY !== null) {
+                const startX = Math.floor(unit.x / TILE_SIZE);
+                const startY = Math.floor(unit.y / TILE_SIZE);
+                const path = this.pathfindingManager.findPath(
+                  startX, 
+                  startY, 
+                  unitData.targetX, 
+                  unitData.targetY
+                );
+                if (path.length > 0) {
+                  unit.setPath(path);
+                }
+              } else if (unitData.isMoving === false) {
+                // Server says unit is not moving
+                unit.stopMoving();
+              }
+            }
+            
+            // Clear prediction status
+            unit.isPredicted = false;
+          }
+          
+          // Update unit health and other attributes
+          if (unitData.health !== undefined) {
+            unit.health = unitData.health;
+          }
+        }
+      });
+    }
+    
+    // Handle buildings
+    if (changes.buildings) {
+      Object.entries(changes.buildings).forEach(([buildingId, buildingData]: [string, any]) => {
+        const building = this.buildingManager.getBuilding(buildingId);
+        
+        if (building && buildingData.health !== undefined) {
+          building.health = buildingData.health;
+        }
+      });
+    }
+    
+    // Update player resources
+    if (changes.resources) {
+      Object.entries(changes.resources).forEach(([playerId, resourceData]: [string, any]) => {
+        this.resourceManager.updateResources(playerId, resourceData);
+      });
+    }
+    
+    // Update the UI to reflect any changes
+    this.gameUI.updateResources();
   }
   
   // Method to start building placement mode - added for 3D view interaction
