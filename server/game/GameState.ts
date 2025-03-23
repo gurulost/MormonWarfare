@@ -372,17 +372,467 @@ export class GameState {
     }
   }
   
+  /**
+   * Update the game state based on time elapsed
+   * This handles continuous processes like:
+   * - Resource gathering
+   * - Unit movement
+   * - Building production
+   * - Combat
+   * 
+   * @param deltaTime Time since last update in milliseconds
+   */
+  update(deltaTime: number): void {
+    // Calculate real seconds for game time scaling (speed up or slow down game)
+    const seconds = deltaTime / 1000;
+    
+    // Update all units
+    this.updateUnits(seconds);
+    
+    // Update all buildings
+    this.updateBuildings(seconds);
+    
+    // Update all resources (automatic gathering, decay, etc.)
+    this.updateResources(seconds);
+  }
+  
+  /**
+   * Update all units in the game (movement, gathering, combat)
+   */
+  private updateUnits(deltaSeconds: number): void {
+    this.units.forEach((unit) => {
+      // Process unit movement
+      if (unit.isMoving && unit.path && unit.path.length > 0) {
+        this.updateUnitMovement(unit, deltaSeconds);
+      }
+      
+      // Process resource gathering
+      if (unit.isGathering && unit.targetResourceX !== null && unit.targetResourceY !== null) {
+        this.updateResourceGathering(unit, deltaSeconds);
+      }
+      
+      // Handle automatic combat (units attacking when in range)
+      if (unit.isAttacking && unit.targetUnitId) {
+        this.updateCombat(unit, deltaSeconds);
+      }
+    });
+  }
+  
+  /**
+   * Update unit position based on its current path
+   */
+  private updateUnitMovement(unit: any, deltaSeconds: number): void {
+    if (!unit.path || unit.path.length === 0) {
+      unit.isMoving = false;
+      return;
+    }
+    
+    // Get next waypoint
+    const nextWaypoint = unit.path[0];
+    
+    // Calculate distance to waypoint
+    const dx = nextWaypoint.x - unit.x;
+    const dy = nextWaypoint.y - unit.y;
+    const distanceToWaypoint = Math.sqrt(dx * dx + dy * dy);
+    
+    // Calculate how far unit can move this frame
+    const moveDistance = unit.speed * deltaSeconds * 10; // Scale by 10 for better movement speed
+    
+    if (distanceToWaypoint <= moveDistance) {
+      // Reached waypoint
+      unit.x = nextWaypoint.x;
+      unit.y = nextWaypoint.y;
+      unit.path.shift();
+      
+      // If no more waypoints, stop moving
+      if (unit.path.length === 0) {
+        unit.isMoving = false;
+      }
+    } else {
+      // Move toward waypoint
+      const ratio = moveDistance / distanceToWaypoint;
+      unit.x += dx * ratio;
+      unit.y += dy * ratio;
+    }
+  }
+  
+  /**
+   * Update resource gathering for workers
+   */
+  private updateResourceGathering(unit: any, deltaSeconds: number): void {
+    // Only worker units can gather resources
+    if (unit.type !== "worker") return;
+    
+    // Check if the resource exists
+    const tileX = Math.floor(unit.targetResourceX);
+    const tileY = Math.floor(unit.targetResourceY);
+    
+    if (!this.isValidPosition(tileX, tileY) || !this.map[tileY][tileX].resource) {
+      unit.isGathering = false;
+      unit.targetResourceX = null;
+      unit.targetResourceY = null;
+      return;
+    }
+    
+    const resource = this.map[tileY][tileX].resource;
+    
+    // Calculate how much to gather this update
+    // Based on gather rate and faction bonuses
+    const player = this.players.get(unit.playerId);
+    if (!player) return;
+    
+    // If not carrying any resources, gather from node
+    if (!unit.carryingResource) {
+      // Increase gather progress
+      unit.gatherProgress = (unit.gatherProgress || 0) + deltaSeconds;
+      
+      // Complete a gathering cycle
+      if (unit.gatherProgress >= 3) { // 3 seconds to gather
+        unit.gatherProgress = 0;
+        
+        // Start carrying resource
+        const amountToGather = Math.min(resource.amount, 10);
+        
+        if (amountToGather <= 0) {
+          // Resource depleted
+          this.map[tileY][tileX].resource = null;
+          unit.isGathering = false;
+          return;
+        }
+        
+        // Player now carrying resource
+        unit.carryingResource = {
+          type: resource.type,
+          amount: amountToGather
+        };
+        
+        // Reduce resource node amount
+        resource.amount -= amountToGather;
+      }
+    } else {
+      // If already carrying resource, find dropoff point
+      // Find nearest city center
+      let nearestBuilding = null;
+      let nearestDistance = Infinity;
+      
+      this.buildings.forEach((building) => {
+        if (building.playerId === unit.playerId && building.type === "cityCenter") {
+          const dist = Math.hypot(building.x - unit.x, building.y - unit.y);
+          if (dist < nearestDistance) {
+            nearestDistance = dist;
+            nearestBuilding = building;
+          }
+        }
+      });
+      
+      // If close enough to dropoff, deposit resources
+      if (nearestBuilding && nearestDistance < 3) {
+        // Add resources to player
+        const resourceAmount = unit.carryingResource.amount;
+        if (unit.carryingResource.type === "food") {
+          player.addResources(resourceAmount, 0);
+        } else {
+          player.addResources(0, resourceAmount);
+        }
+        
+        // Clear carried resources
+        unit.carryingResource = null;
+      } else if (nearestBuilding) {
+        // Move toward dropoff point
+        unit.isMoving = true;
+        unit.isGathering = false;
+        unit.path = [{
+          x: nearestBuilding.x,
+          y: nearestBuilding.y
+        }];
+      } else {
+        // No dropoff found, cancel gathering
+        unit.isGathering = false;
+        unit.carryingResource = null;
+      }
+    }
+  }
+  
+  /**
+   * Update combat between units
+   */
+  private updateCombat(unit: any, deltaSeconds: number): void {
+    // Find target unit
+    const targetUnit = this.units.get(unit.targetUnitId);
+    
+    // If target doesn't exist anymore, stop attacking
+    if (!targetUnit) {
+      unit.isAttacking = false;
+      unit.targetUnitId = null;
+      return;
+    }
+    
+    // Check if in range
+    const distance = Math.hypot(targetUnit.x - unit.x, targetUnit.y - unit.y);
+    const inRange = distance <= unit.range;
+    
+    if (!inRange) {
+      // Move toward target
+      unit.isMoving = true;
+      unit.path = [{
+        x: targetUnit.x,
+        y: targetUnit.y
+      }];
+      return;
+    }
+    
+    // Attack cooldown
+    unit.attackCooldown = (unit.attackCooldown || 0) - deltaSeconds;
+    if (unit.attackCooldown <= 0) {
+      // Reset cooldown
+      unit.attackCooldown = 1; // 1 second between attacks
+      
+      // Calculate damage based on unit stats, counter bonuses, etc.
+      let damage = unit.attack;
+      
+      // Apply counter bonuses if applicable
+      if (this.isCounterUnit(unit.type, targetUnit.type)) {
+        damage *= 1.5; // 50% more damage when using counter
+      }
+      
+      // Apply weakness penalties
+      if (this.isWeakToUnit(unit.type, targetUnit.type)) {
+        damage *= 0.75; // 25% less damage when weak against target
+      }
+      
+      // Apply defense reduction
+      damage = Math.max(1, damage - targetUnit.defense);
+      
+      // Apply damage to target
+      targetUnit.health -= damage;
+      
+      // Check if target is dead
+      if (targetUnit.health <= 0) {
+        this.units.delete(targetUnit.id);
+        unit.isAttacking = false;
+        unit.targetUnitId = null;
+      }
+    }
+  }
+  
+  /**
+   * Determine if unitType has a counter advantage against targetType
+   */
+  private isCounterUnit(unitType: string, targetType: string): boolean {
+    const counterMap: Record<string, string[]> = {
+      "melee": ["ranged"],
+      "ranged": ["cavalry"],
+      "cavalry": ["melee"],
+      "hero": []
+    };
+    
+    return counterMap[unitType]?.includes(targetType) || false;
+  }
+  
+  /**
+   * Determine if unitType is weak against targetType
+   */
+  private isWeakToUnit(unitType: string, targetType: string): boolean {
+    const weaknessMap: Record<string, string[]> = {
+      "melee": ["cavalry"],
+      "ranged": ["melee"],
+      "cavalry": ["ranged"],
+      "hero": []
+    };
+    
+    return weaknessMap[unitType]?.includes(targetType) || false;
+  }
+  
+  /**
+   * Update building production and capabilities
+   */
+  private updateBuildings(deltaSeconds: number): void {
+    this.buildings.forEach((building) => {
+      // Handle production queue
+      if (building.productionQueue && building.productionQueue.length > 0) {
+        const currentProduction = building.productionQueue[0];
+        
+        // Progress production
+        currentProduction.remainingTime -= deltaSeconds * 1000; // Convert to ms
+        
+        // If production complete
+        if (currentProduction.remainingTime <= 0) {
+          // Remove from queue
+          building.productionQueue.shift();
+          
+          // Create the produced unit
+          if (currentProduction.type === "worker" || 
+              currentProduction.type === "melee" || 
+              currentProduction.type === "ranged" || 
+              currentProduction.type === "cavalry" || 
+              currentProduction.type === "hero") {
+            
+            // Create unit near building
+            this.createUnitNearBuilding(building, currentProduction.type);
+          }
+        }
+      }
+    });
+  }
+  
+  /**
+   * Create a new unit near a building
+   */
+  private createUnitNearBuilding(building: any, unitType: string): string {
+    // Find a valid position near the building
+    const positions = [
+      { x: building.x + 2, y: building.y },
+      { x: building.x - 2, y: building.y },
+      { x: building.x, y: building.y + 2 },
+      { x: building.x, y: building.y - 2 },
+      { x: building.x + 1, y: building.y + 1 },
+      { x: building.x - 1, y: building.y - 1 },
+      { x: building.x + 1, y: building.y - 1 },
+      { x: building.x - 1, y: building.y + 1 }
+    ];
+    
+    let validPosition = null;
+    
+    for (const pos of positions) {
+      if (this.isValidAndWalkablePosition(pos.x, pos.y)) {
+        validPosition = pos;
+        break;
+      }
+    }
+    
+    // If no valid position found, try to find one nearby
+    if (!validPosition) {
+      for (let xOffset = -3; xOffset <= 3; xOffset++) {
+        for (let yOffset = -3; yOffset <= 3; yOffset++) {
+          const x = building.x + xOffset;
+          const y = building.y + yOffset;
+          
+          if (this.isValidAndWalkablePosition(x, y)) {
+            validPosition = { x, y };
+            break;
+          }
+        }
+        if (validPosition) break;
+      }
+    }
+    
+    // If still no valid position, return empty string (failed to create)
+    if (!validPosition) {
+      return "";
+    }
+    
+    // Create the unit
+    const unitId = `unit_${this.nextUnitId++}`;
+    const player = this.players.get(building.playerId);
+    
+    if (!player) return "";
+    
+    const faction = player.getFaction() || "Nephites"; // Default to Nephites if not set
+    
+    // Get base stats for this unit type
+    const stats = UNIT_STATS[unitType] || { 
+      health: 100, attack: 10, defense: 5, range: 1, speed: 2 
+    };
+    
+    // Create the unit object
+    const unit = {
+      id: unitId,
+      playerId: building.playerId,
+      type: unitType,
+      faction,
+      health: stats.health,
+      maxHealth: stats.health,
+      attack: stats.attack,
+      defense: stats.defense,
+      range: stats.range,
+      speed: stats.speed,
+      x: validPosition.x,
+      y: validPosition.y,
+      isMoving: false,
+      isGathering: false,
+      isAttacking: false,
+      path: [],
+      targetResourceX: null,
+      targetResourceY: null,
+      targetUnitId: null,
+      carryingResource: null
+    };
+    
+    // Add to units map
+    this.units.set(unitId, unit);
+    
+    return unitId;
+  }
+  
+  /**
+   * Check if position is valid and walkable
+   */
+  private isValidAndWalkablePosition(x: number, y: number): boolean {
+    return this.isValidPosition(x, y) && this.isWalkable(x, y);
+  }
+  
+  /**
+   * Update resource nodes and automatic player income
+   */
+  private updateResources(deltaSeconds: number): void {
+    // Handle automatic income ticks for players (if implementing)
+    // For example, 1 food per 10 seconds for each player
+    
+    this.players.forEach((player) => {
+      // Example of minimal passive income
+      const passiveIncome = deltaSeconds * 0.05; // 0.05 resource per second
+      player.addResources(passiveIncome, passiveIncome / 2);
+    });
+  }
+
   getGameState(): any {
     return {
-      players: Array.from(this.players.values()).map(player => ({
-        id: player.id,
-        username: player.getUsername(),
-        faction: player.getFaction(),
-        resources: player.getResources()
-      })),
-      units: Array.from(this.units.values()),
-      buildings: Array.from(this.buildings.values()),
-      map: this.map
+      players: Object.fromEntries(
+        Array.from(this.players.entries()).map(([id, player]) => [
+          id,
+          {
+            id,
+            username: player.getUsername(),
+            faction: player.getFaction(),
+            resources: player.getResources()
+          }
+        ])
+      ),
+      units: Object.fromEntries(
+        Array.from(this.units.entries()).map(([id, unit]) => [
+          id,
+          {
+            id,
+            playerId: unit.playerId,
+            type: unit.type,
+            x: unit.x,
+            y: unit.y,
+            health: unit.health,
+            maxHealth: unit.maxHealth,
+            isMoving: unit.isMoving || false,
+            isGathering: unit.isGathering || false,
+            isAttacking: unit.isAttacking || false,
+            carryingResource: unit.carryingResource
+          }
+        ])
+      ),
+      buildings: Object.fromEntries(
+        Array.from(this.buildings.entries()).map(([id, building]) => [
+          id,
+          {
+            id,
+            playerId: building.playerId,
+            type: building.type,
+            x: building.x,
+            y: building.y,
+            health: building.health,
+            maxHealth: building.maxHealth,
+            productionQueue: building.productionQueue || []
+          }
+        ])
+      ),
+      map: this.map,
+      timestamp: Date.now() // Include timestamp for synchronization
     };
   }
 }
