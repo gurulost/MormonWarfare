@@ -64,6 +64,11 @@ export function loadAssets(scene: Phaser.Scene) {
   createRectangleTexture(scene, 'minimap-bg', 0x000000, 150, 150, 0.7);
   createRectangleTexture(scene, 'health-bar-bg', 0x000000, 30, 5);
   createRectangleTexture(scene, 'health-bar', 0x00ff00, 30, 5);
+  
+  // Particle effects
+  createCircleTexture(scene, 'particle', 0xffff00, 8);
+  createCircleTexture(scene, 'particle-blue', 0x00aaff, 8);
+  createCircleTexture(scene, 'particle-red', 0xff5555, 8);
 }
 
 // Helper function to create a colored circle texture

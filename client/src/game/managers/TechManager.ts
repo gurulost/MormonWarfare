@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { FactionType, TechInfo, UnitType, BuildingType } from "../types";
 import { TECH_COSTS } from "../config";
 import { useMultiplayer } from "../../lib/stores/useMultiplayer";
+import { useAudio } from "../../lib/stores/useAudio";
 import { Unit } from "../entities/Unit";
 import { Building } from "../entities/Building";
 
@@ -541,10 +542,13 @@ export class TechManager {
       }
     });
     
-    // Play a sound
-    const audioState = this.scene.game.registry.get("audioState");
-    if (audioState && !audioState.isMuted && audioState.playSuccess) {
-      audioState.playSuccess();
+    // Play a success sound directly using the built-in Phaser sound system
+    try {
+      if (this.scene.sound && this.scene.sound.get('success-sound')) {
+        this.scene.sound.play('success-sound', { volume: 0.5 });
+      }
+    } catch (error) {
+      console.log("Error playing tech research sound:", error);
     }
   }
   
