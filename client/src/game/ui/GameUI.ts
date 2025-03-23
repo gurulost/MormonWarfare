@@ -349,7 +349,7 @@ export class GameUI {
         fontFamily: "monospace",
         fontSize: "18px",
         color: player.faction === "Nephites" ? "#88aaff" : "#ff8888",
-        backgroundColor: 0x333333,
+        backgroundColor: "#333333",
         padding: { x: 10, y: 5 }
       })
         .setOrigin(0.5);
