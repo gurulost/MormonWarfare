@@ -115,6 +115,13 @@ export class GameRoom {
     return this.players.size >= MAX_PLAYERS;
   }
   
+  /**
+   * Get all player IDs in this room
+   */
+  getPlayerIds(): string[] {
+    return Array.from(this.players.keys());
+  }
+  
   isGameStarted(): boolean {
     return this.gameStarted;
   }

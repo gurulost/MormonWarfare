@@ -2,16 +2,23 @@ import { Server } from "http";
 import { WebSocket, WebSocketServer } from "ws";
 import { GameRoom } from "./game/GameRoom";
 import { Player } from "./game/Player";
+import { ServerTickManager } from "./game/ServerTickManager";
 
 export class SocketServer {
   private wss: WebSocketServer;
   private rooms: Map<string, GameRoom>;
+  private tickManager: ServerTickManager;
+  private pingInterval: NodeJS.Timeout | null = null;
   
   constructor(server: Server) {
     this.wss = new WebSocketServer({ server });
     this.rooms = new Map();
     
+    // Create tick manager for optimized game state updates
+    this.tickManager = new ServerTickManager(this.rooms, 15); // 15 ticks per second
+    
     this.setupSocketServer();
+    this.startPingInterval();
   }
   
   private setupSocketServer() {
@@ -41,15 +48,37 @@ export class SocketServer {
         this.handleClientDisconnect(clientId);
       });
       
-      // Send initial connection acknowledgment
+      // Send initial connection acknowledgment with timestamp for latency calculation
       this.sendToClient(ws, {
         type: "connection",
         clientId,
+        timestamp: Date.now(),
         success: true
       });
     });
     
-    console.log("WebSocket server initialized");
+    // Start the tick manager when server is ready
+    this.tickManager.start();
+    console.log("WebSocket server initialized with tick-based synchronization");
+  }
+  
+  /**
+   * Start periodic ping to measure client latency
+   */
+  private startPingInterval() {
+    // Send ping every 3 seconds to measure latency
+    this.pingInterval = setInterval(() => {
+      // For each room, ping all clients
+      this.rooms.forEach(room => {
+        // Get all players in the room
+        const playerIds = Array.from(room.getPlayerIds ? room.getPlayerIds() : []);
+        playerIds.forEach(playerId => {
+          if (room.pingPlayer) {
+            room.pingPlayer(playerId);
+          }
+        });
+      });
+    }, 3000);
   }
   
   private handleMessage(ws: WebSocket, data: any) {
@@ -77,9 +106,69 @@ export class SocketServer {
         this.handleGameEvent(clientId, data);
         break;
         
+      case "pong":
+        this.handlePongResponse(clientId, data);
+        break;
+        
+      case "reconnect":
+        this.handleReconnection(ws, clientId, data);
+        break;
+        
       default:
         console.warn(`Unknown message type: ${data.type}`);
         this.sendError(ws, `Unknown message type: ${data.type}`);
+    }
+  }
+  
+  /**
+   * Handle ping response from client for latency measurement
+   */
+  private handlePongResponse(clientId: string, data: any) {
+    const { roomCode, timestamp } = data;
+    
+    if (!roomCode || !this.rooms.has(roomCode)) {
+      return;
+    }
+    
+    const room = this.rooms.get(roomCode)!;
+    
+    // Process pong to update latency data
+    if (room.processPong && timestamp) {
+      room.processPong(clientId, timestamp);
+    }
+  }
+  
+  /**
+   * Handle client reconnection with token
+   */
+  private handleReconnection(ws: WebSocket, clientId: string, data: any) {
+    const { roomCode, playerId, reconnectToken } = data;
+    
+    if (!roomCode || !this.rooms.has(roomCode) || !playerId || !reconnectToken) {
+      this.sendError(ws, "Invalid reconnection data");
+      return;
+    }
+    
+    const room = this.rooms.get(roomCode)!;
+    
+    // Try to reconnect using token
+    if (room.reconnectPlayer && room.reconnectPlayer(playerId, reconnectToken, ws)) {
+      // Update the websocket's clientId to match the reconnected playerId
+      (ws as any).clientId = playerId;
+      
+      // Send success response
+      this.sendToClient(ws, {
+        type: "reconnectSuccess",
+        playerId,
+        roomCode
+      });
+      
+      console.log(`Player ${playerId} successfully reconnected to room ${roomCode}`);
+      
+      // Broadcast room update to all players
+      this.broadcastRoomUpdate(roomCode);
+    } else {
+      this.sendError(ws, "Reconnection failed: invalid token");
     }
   }
   

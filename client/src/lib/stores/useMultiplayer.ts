@@ -46,24 +46,66 @@ export const useMultiplayer = create<MultiplayerState>((set, get) => ({
   gameEventListeners: [],
   
   connectToServer: () => {
-    // In a real implementation, this would connect to a WebSocket server
-    // For now, we'll simulate it
     console.log("Connecting to multiplayer server...");
     
-    // Create a simulated socket
-    const mockSocket = {
-      send: (data: string) => {
-        console.log("Sending data to server:", data);
-      },
-      close: () => {
-        console.log("Disconnecting from server");
-      }
-    };
-    
-    set({ 
-      connected: true,
-      socket: mockSocket as any
-    });
+    try {
+      // Create actual WebSocket connection (use secure connection if in production)
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.host;
+      const socket = new WebSocket(`${protocol}//${host}`);
+      
+      socket.onopen = () => {
+        console.log("WebSocket connection established");
+        set({ connected: true, socket });
+      };
+      
+      socket.onclose = () => {
+        console.log("WebSocket connection closed");
+        set({ connected: false, socket: null });
+        
+        // Try to reconnect after delay
+        setTimeout(() => {
+          const state = get();
+          if (!state.connected && state.roomCode) {
+            console.log("Attempting to reconnect...");
+            get().connectToServer();
+          }
+        }, 3000);
+      };
+      
+      socket.onerror = (error) => {
+        console.error("WebSocket error:", error);
+      };
+      
+      socket.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          handleServerMessage(message);
+        } catch (error) {
+          console.error("Error parsing server message:", error);
+        }
+      };
+      
+      set({ socket });
+    } catch (error) {
+      console.error("Failed to connect to server:", error);
+      
+      // Fallback to mock socket for development without server
+      console.log("Using mock socket for development");
+      const mockSocket = {
+        send: (data: string) => {
+          console.log("Sending data to server (mock):", data);
+        },
+        close: () => {
+          console.log("Disconnecting from server (mock)");
+        }
+      };
+      
+      set({ 
+        connected: true,
+        socket: mockSocket as any
+      });
+    }
     
     console.log("Connected to multiplayer server");
   },
@@ -340,6 +382,118 @@ export const useMultiplayer = create<MultiplayerState>((set, get) => ({
     };
   }
 }));
+
+// Handle incoming server messages
+function handleServerMessage(message: any) {
+  const state = useMultiplayer.getState();
+  
+  switch (message.type) {
+    case "connection":
+      console.log("Connection acknowledged, client ID:", message.clientId);
+      
+      // Store connection data like reconnection tokens
+      localStorage.setItem("clientId", message.clientId);
+      
+      // If we have a room saved from previous session, try to reconnect
+      const savedRoomCode = localStorage.getItem("roomCode");
+      const savedPlayerId = localStorage.getItem("playerId");
+      const reconnectToken = localStorage.getItem("reconnectToken");
+      
+      if (savedRoomCode && savedPlayerId && reconnectToken && state.socket) {
+        console.log("Attempting to reconnect to previous room:", savedRoomCode);
+        state.socket.send(JSON.stringify({
+          type: "reconnect",
+          roomCode: savedRoomCode,
+          playerId: savedPlayerId,
+          reconnectToken
+        }));
+      }
+      break;
+      
+    case "connection_data":
+      // Store reconnection token securely
+      if (message.reconnectToken && message.playerId) {
+        localStorage.setItem("reconnectToken", message.reconnectToken);
+        localStorage.setItem("playerId", message.playerId);
+      }
+      break;
+      
+    case "reconnectSuccess":
+      console.log("Successfully reconnected to game");
+      useMultiplayer.setState({ 
+        roomCode: message.roomCode
+      });
+      localStorage.setItem("roomCode", message.roomCode);
+      break;
+      
+    case "roomUpdate":
+      console.log("Room update received:", message.room);
+      useMultiplayer.setState({
+        roomCode: message.room.roomCode,
+        players: message.room.players
+      });
+      localStorage.setItem("roomCode", message.room.roomCode);
+      break;
+      
+    case "gameStart":
+      console.log("Game started:", message.gameData);
+      // Forward game start event to listeners
+      notifyGameEventListeners({
+        type: "gameStart",
+        gameData: message.gameData
+      });
+      break;
+      
+    case "gameEvent":
+      // Forward game events to listeners
+      notifyGameEventListeners(message.event);
+      break;
+      
+    case "stateUpdate":
+      // Process delta state updates
+      processStateUpdate(message.changes, message.tick);
+      break;
+      
+    case "ping":
+      // Respond to ping with pong to measure latency
+      respondToPing(message.timestamp);
+      break;
+      
+    case "error":
+      console.error("Server error:", message.message);
+      break;
+      
+    default:
+      console.warn("Unknown message type received:", message.type);
+  }
+}
+
+// Process delta state updates from server
+function processStateUpdate(changes: any, timestamp: number) {
+  // Apply delta changes to game state
+  const state = useMultiplayer.getState();
+  
+  // Notify listeners of state update
+  notifyGameEventListeners({
+    type: "stateUpdate",
+    changes,
+    timestamp
+  });
+}
+
+// Respond to ping with pong
+function respondToPing(timestamp: number) {
+  const state = useMultiplayer.getState();
+  const { socket, roomCode } = state;
+  
+  if (socket && roomCode) {
+    socket.send(JSON.stringify({
+      type: "pong",
+      roomCode,
+      timestamp
+    }));
+  }
+}
 
 // Helper function to notify all game event listeners
 function notifyGameEventListeners(event: MultiplayerEvent) {
