@@ -287,6 +287,7 @@ export class UnitManager {
       fromServer?: boolean;
       isPrediction?: boolean;
       isReapplied?: boolean;
+      actionId?: string; // Add actionId parameter for prediction tracking
     } = {}
   ) {
     const { fromServer = false, isPrediction = false, isReapplied = false } = options;
