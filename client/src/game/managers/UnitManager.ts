@@ -140,9 +140,10 @@ export class UnitManager {
     });
     
     // Select the closest unit if found
-    if (closestUnit) {
-      closestUnit.setSelected(true);
-      return closestUnit.id;
+    if (closestUnit !== null) {
+      const unitToSelect = closestUnit as Unit;
+      unitToSelect.setSelected(true);
+      return unitToSelect.id;
     }
     
     return null;
@@ -499,7 +500,7 @@ export class UnitManager {
   
   update(delta: number) {
     // Update all units
-    this.units.forEach(unit => {
+    this.units.forEach((unit: Unit) => {
       unit.update(delta);
       
       // Handle resource gathering for worker units
@@ -865,7 +866,7 @@ export class UnitManager {
     return null;
   }
   
-  private findNearestBuilding(x: number, y: number, playerId: string, type: string) {
+  private findNearestBuilding(x: number, y: number, playerId: string, type: string): any {
     // Get building manager
     const buildingManager = this.scene.game.registry.get("buildingManager");
     if (!buildingManager) return null;
