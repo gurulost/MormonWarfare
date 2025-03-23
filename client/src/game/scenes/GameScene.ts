@@ -48,11 +48,15 @@ export class GameScene extends Phaser.Scene {
   init(data: { gameData: GameData }) {
     this.gameData = data.gameData;
     this.localPlayerId = "local"; // In a real implementation, this would come from the server
-    this.players = this.gameData.players.map(player => ({
-      id: player.id,
-      username: player.username,
-      faction: player.faction as FactionType
-    }));
+    
+    // Make sure we only include players with valid factions
+    this.players = this.gameData.players
+      .filter(player => player.faction !== null)
+      .map(player => ({
+        id: player.id,
+        username: player.username,
+        faction: player.faction as FactionType
+      }));
   }
   
   create() {
