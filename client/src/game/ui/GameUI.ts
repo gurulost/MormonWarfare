@@ -314,12 +314,12 @@ export class GameUI {
     const { width, height } = this.scene.cameras.main;
     
     // Create background
-    const techPanelBg = this.scene.add.rectangle(0, 0, 600, 400, 0x222222, 0.9)
+    const techPanelBg = this.scene.add.rectangle(0, 0, 600, 500, 0x222222, 0.9)
       .setStrokeStyle(2, 0xffffff)
       .setOrigin(0.5);
     
     // Create title
-    const techTitle = this.scene.add.text(0, -170, "TECHNOLOGIES", {
+    const techTitle = this.scene.add.text(0, -220, "TECHNOLOGIES", {
       fontFamily: "monospace",
       fontSize: "24px",
       color: "#ffffff",
@@ -328,7 +328,7 @@ export class GameUI {
       .setOrigin(0.5);
     
     // Create close button
-    const closeButton = this.scene.add.text(270, -170, "X", {
+    const closeButton = this.scene.add.text(270, -220, "X", {
       fontFamily: "monospace",
       fontSize: "20px",
       color: "#ffffff",
@@ -339,8 +339,86 @@ export class GameUI {
       .setInteractive({ useHandCursor: true })
       .on("pointerdown", () => this.toggleTechPanel());
     
+    // Add faction banner
+    const playerId = this.scene.registry.get("localPlayerId");
+    const players = this.scene.registry.get("players") || [];
+    const player = players.find((p: any) => p.id === playerId);
+    
+    if (player) {
+      const factionBanner = this.scene.add.text(0, -180, `${player.faction} Tech Tree`, {
+        fontFamily: "monospace",
+        fontSize: "18px",
+        color: player.faction === "Nephites" ? "#88aaff" : "#ff8888",
+        backgroundColor: 0x333333,
+        padding: { x: 10, y: 5 }
+      })
+        .setOrigin(0.5);
+      
+      this.techPanel.add(factionBanner);
+    }
+    
+    // Tab buttons for different tech categories
+    const militaryTechBtn = this.scene.add.text(-160, -140, "MILITARY", {
+      fontFamily: "monospace",
+      fontSize: "14px",
+      color: "#ffffff",
+      backgroundColor: "#4a6c6f",
+      padding: { x: 10, y: 5 }
+    })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .setData("category", "military");
+    
+    const economyTechBtn = this.scene.add.text(-40, -140, "ECONOMY", {
+      fontFamily: "monospace",
+      fontSize: "14px",
+      color: "#ffffff",
+      backgroundColor: "#4a6c6f",
+      padding: { x: 10, y: 5 }
+    })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .setData("category", "economy");
+    
+    const defenseTechBtn = this.scene.add.text(80, -140, "DEFENSE", {
+      fontFamily: "monospace",
+      fontSize: "14px",
+      color: "#ffffff",
+      backgroundColor: "#4a6c6f",
+      padding: { x: 10, y: 5 }
+    })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .setData("category", "defense");
+    
+    const specialTechBtn = this.scene.add.text(200, -140, "SPECIAL", {
+      fontFamily: "monospace",
+      fontSize: "14px",
+      color: "#ffffff",
+      backgroundColor: "#4a6c6f",
+      padding: { x: 10, y: 5 }
+    })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .setData("category", "special");
+    
+    // Set up category button interactions
+    [militaryTechBtn, economyTechBtn, defenseTechBtn, specialTechBtn].forEach(btn => {
+      btn.on("pointerover", () => btn.setStyle({ color: "#ffff00" }))
+         .on("pointerout", () => btn.setStyle({ color: "#ffffff" }))
+         .on("pointerdown", () => {
+           // Store selected category
+           this.techPanel.setData("selectedCategory", btn.getData("category"));
+           this.updateTechPanel();
+         });
+    });
+    
+    // Set default category
+    this.techPanel.setData("selectedCategory", "military");
+    
     // Add to panel
-    this.techPanel.add([techPanelBg, techTitle, closeButton]);
+    this.techPanel.add([techPanelBg, techTitle, closeButton, 
+                        militaryTechBtn, economyTechBtn, defenseTechBtn, specialTechBtn]);
     
     // Will add tech items when panel is opened
   }
@@ -355,35 +433,141 @@ export class GameUI {
   }
   
   private updateTechPanel() {
-    // Remove existing tech items
+    // Remove existing tech items except for initial elements (bg, title, etc.)
+    const fixedElementCount = 7; // Background, title, close button, faction banner, and 4 category tabs
     const children = this.techPanel.getAll();
-    for (let i = children.length - 1; i >= 3; i--) {
-      // Keep the first 3 items (bg, title, close button)
+    for (let i = children.length - 1; i >= fixedElementCount; i--) {
       children[i].destroy();
     }
     
-    // Get player's faction
+    // Get player's faction and selected category
     const playerId = this.scene.registry.get("localPlayerId");
     const players = this.scene.registry.get("players") || [];
     const player = players.find((p: any) => p.id === playerId);
     if (!player) return;
     
-    // Get available technologies
-    const techs = this.techManager.getResearchableTechs(playerId, player.faction);
+    const selectedCategory = this.techPanel.getData("selectedCategory") || "military";
     
-    // Create tech items
-    let yOffset = -100;
-    techs.forEach((tech, index) => {
+    // Highlight the selected category button
+    for (let i = 3; i < 7; i++) {
+      if (i < children.length) {
+        const categoryBtn = children[i] as Phaser.GameObjects.Text;
+        const btnCategory = categoryBtn.getData("category");
+        
+        if (btnCategory === selectedCategory) {
+          categoryBtn.setStyle({ 
+            backgroundColor: "#5d8a8d",
+            color: "#ffff00"
+          });
+        } else {
+          categoryBtn.setStyle({ 
+            backgroundColor: "#4a6c6f",
+            color: "#ffffff"
+          });
+        }
+      }
+    }
+    
+    // Get available technologies and filter by category
+    const allTechs = this.techManager.getResearchableTechs(playerId, player.faction);
+    const techs = allTechs.filter(tech => {
+      // Assign categories based on tech effects or id
+      let category = "military";
+      
+      if (tech.id.includes("agriculture") || 
+          tech.id.includes("economy") || 
+          tech.id.includes("resources") ||
+          tech.effects.foodGatherRate) {
+        category = "economy";
+      } else if (tech.id.includes("fortification") || 
+                tech.id.includes("defense") || 
+                tech.id.includes("wall") ||
+                tech.effects.defense ||
+                tech.effects.buildingDefense) {
+        category = "defense";
+      } else if (tech.id.includes("special") || 
+                tech.faction) {
+        category = "special";
+      }
+      
+      return category === selectedCategory;
+    });
+    
+    // Get researched technologies in this category to show at the top
+    const researchedTechs = Array.from(this.techManager.getTechnologies(playerId, player.faction))
+      .filter(tech => {
+        // Same categorization logic as above
+        let category = "military";
+        
+        if (tech.id.includes("agriculture") || 
+            tech.id.includes("economy") || 
+            tech.id.includes("resources") ||
+            tech.effects?.foodGatherRate) {
+          category = "economy";
+        } else if (tech.id.includes("fortification") || 
+                  tech.id.includes("defense") || 
+                  tech.id.includes("wall") ||
+                  tech.effects?.defense ||
+                  tech.effects?.buildingDefense) {
+          category = "defense";
+        } else if (tech.id.includes("special") || 
+                  tech.faction) {
+          category = "special";
+        }
+        
+        return category === selectedCategory && tech.researched;
+      });
+    
+    // Create researched tech items first (grayed out)
+    let yOffset = -90;
+    
+    // If there are researched techs, add a heading
+    if (researchedTechs.length > 0) {
+      const researchedHeader = this.scene.add.text(0, yOffset, "RESEARCHED TECHNOLOGIES", {
+        fontFamily: "monospace",
+        fontSize: "14px",
+        color: "#aaaaaa",
+        align: "center"
+      }).setOrigin(0.5);
+      
+      this.techPanel.add(researchedHeader);
+      yOffset += 30;
+      
+      researchedTechs.forEach(tech => {
+        const techItem = this.createCompletedTechItem(tech, 0, yOffset);
+        this.techPanel.add(techItem);
+        yOffset += 60;
+      });
+      
+      // Add a separator
+      const separator = this.scene.add.line(0, yOffset + 10, -250, 0, 250, 0, 0xaaaaaa);
+      this.techPanel.add(separator);
+      yOffset += 30;
+    }
+    
+    // Add heading for available techs
+    const availableHeader = this.scene.add.text(0, yOffset, "AVAILABLE TECHNOLOGIES", {
+      fontFamily: "monospace",
+      fontSize: "14px",
+      color: "#ffffff",
+      align: "center"
+    }).setOrigin(0.5);
+    
+    this.techPanel.add(availableHeader);
+    yOffset += 30;
+    
+    // Create available tech items
+    techs.forEach(tech => {
       const techItem = this.createTechItem(tech, 0, yOffset);
       this.techPanel.add(techItem);
       yOffset += 80;
     });
     
-    // If no techs available
+    // If no techs available in this category
     if (techs.length === 0) {
-      const noTechText = this.scene.add.text(0, 0, "No technologies available", {
+      const noTechText = this.scene.add.text(0, yOffset + 20, "No technologies available in this category", {
         fontFamily: "monospace",
-        fontSize: "18px",
+        fontSize: "16px",
         color: "#aaaaaa",
         align: "center"
       })
@@ -391,6 +575,34 @@ export class GameUI {
       
       this.techPanel.add(noTechText);
     }
+  }
+  
+  private createCompletedTechItem(tech: any, x: number, y: number): Phaser.GameObjects.Container {
+    const container = this.scene.add.container(x, y);
+    
+    // Tech background (grayed out)
+    const bg = this.scene.add.rectangle(0, 0, 500, 50, 0x282828)
+      .setStrokeStyle(1, 0x444444);
+    
+    // Tech name
+    const nameText = this.scene.add.text(-230, -10, tech.name, {
+      fontFamily: "monospace",
+      fontSize: "16px",
+      color: "#888888"
+    })
+      .setOrigin(0, 0);
+    
+    // Researched indicator
+    const researchedText = this.scene.add.text(200, -10, "RESEARCHED", {
+      fontFamily: "monospace",
+      fontSize: "14px",
+      color: "#22cc22",
+      align: "right"
+    })
+      .setOrigin(1, 0);
+    
+    container.add([bg, nameText, researchedText]);
+    return container;
   }
   
   private createTechItem(tech: any, x: number, y: number): Phaser.GameObjects.Container {
