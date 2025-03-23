@@ -3,6 +3,8 @@ import { TechInfo, FactionType } from "../types";
 import { TechManager } from "../managers/TechManager";
 import { ResourceManager } from "../managers/ResourceManager";
 
+type CategoryType = "military" | "economy" | "defense" | "special";
+
 /**
  * Enhanced Tech Tree panel with improved visualization of tech dependencies,
  * clearer categorization, and better explanation of strategic choices
@@ -15,7 +17,7 @@ export class EnhancedTechTreePanel {
   private techNodes: Map<string, Phaser.GameObjects.Container>;
   private techConnections: Phaser.GameObjects.Graphics;
   private categoryButtons: Map<string, Phaser.GameObjects.Text>;
-  private selectedCategory: string = "military";
+  private selectedCategory: CategoryType = "military";
   private scrollPosition: number = 0;
   private maxScrollPosition: number = 0;
   private isVisible: boolean = false;
@@ -28,7 +30,7 @@ export class EnhancedTechTreePanel {
   private readonly NODE_SPACING_X: number = 250;
   private readonly NODE_SPACING_Y: number = 150;
   private techTiers: { [key: string]: number } = {}; // Changed from readonly to mutable
-  private readonly CATEGORY_COLORS: { [key: string]: number } = {
+  private readonly CATEGORY_COLORS: Record<CategoryType, number> = {
     military: 0xb92d2d,   // Red for military
     economy: 0x2d8a36,    // Green for economy
     defense: 0x3d6fa3,    // Blue for defense
@@ -36,7 +38,7 @@ export class EnhancedTechTreePanel {
   };
   
   // Descriptions of strategic implications for each category
-  private readonly CATEGORY_DESCRIPTIONS = {
+  private readonly CATEGORY_DESCRIPTIONS: Record<CategoryType, string> = {
     military: "Military technologies enhance your offensive capabilities. Focusing here allows for a more aggressive playstyle.",
     economy: "Economic technologies improve resource gathering and efficiency. Critical for sustained warfare and expansion.",
     defense: "Defensive technologies strengthen your buildings and fortifications. Essential for holding territory.",
@@ -293,7 +295,7 @@ export class EnhancedTechTreePanel {
     
     // First, create all nodes
     techs.forEach(tech => {
-      const tier = this.TECH_TIERS[tech.id] || 0;
+      const tier = this.techTiers[tech.id] || 0;
       const node = this.createTechNode(tech, tier);
       this.techNodes.set(tech.id, node);
       contentContainer.add(node);
@@ -321,12 +323,12 @@ export class EnhancedTechTreePanel {
    */
   private calculateTechTiers(techs: TechInfo[]) {
     // Reset tiers
-    this.TECH_TIERS = {};
+    this.techTiers = {};
     
     // First pass: assign tier 0 to techs with no prerequisites
     techs.forEach(tech => {
       if (tech.prerequisites.length === 0) {
-        this.TECH_TIERS[tech.id] = 0;
+        this.techTiers[tech.id] = 0;
       }
     });
     
@@ -340,16 +342,16 @@ export class EnhancedTechTreePanel {
       
       techs.forEach(tech => {
         // Skip techs that already have a tier assigned
-        if (this.TECH_TIERS[tech.id] !== undefined) return;
+        if (this.techTiers[tech.id] !== undefined) return;
         
         // Check if all prerequisites have tiers assigned
         const prereqTiers = tech.prerequisites
-          .map(prereqId => this.TECH_TIERS[prereqId])
+          .map(prereqId => this.techTiers[prereqId])
           .filter(tier => tier !== undefined);
         
         // If all prerequisites have tiers, assign this tech to next tier
         if (prereqTiers.length === tech.prerequisites.length && prereqTiers.length > 0) {
-          this.TECH_TIERS[tech.id] = Math.max(...prereqTiers) + 1;
+          this.techTiers[tech.id] = Math.max(...prereqTiers) + 1;
           changed = true;
         }
       });
@@ -357,8 +359,8 @@ export class EnhancedTechTreePanel {
     
     // Assign default tier for any remaining techs
     techs.forEach(tech => {
-      if (this.TECH_TIERS[tech.id] === undefined) {
-        this.TECH_TIERS[tech.id] = 0;
+      if (this.techTiers[tech.id] === undefined) {
+        this.techTiers[tech.id] = 0;
       }
     });
   }
@@ -367,25 +369,29 @@ export class EnhancedTechTreePanel {
    * Create a visual node for a technology
    */
   private createTechNode(tech: TechInfo, tier: number): Phaser.GameObjects.Container {
+    // Get current player ID from registry
+    const playerId = this.scene.registry.get("localPlayerId") as string;
+    
     const container = this.scene.add.container(0, 0);
     
     // Position based on tier and category
-    const categoryIndex = ["military", "economy", "defense", "special"].indexOf(this.getTechCategory(tech));
+    const techCategory = this.getTechCategory(tech) as CategoryType;
+    const categoryIndex = ["military", "economy", "defense", "special"].indexOf(techCategory);
     const x = tier * this.NODE_SPACING_X - this.PANEL_WIDTH/2 + 200;
     
     // For same-tier techs, stack them vertically
     const sameTierTechs = Array.from(this.techNodes.values())
-      .filter(node => node.getData("tier") === tier && node.getData("category") === this.getTechCategory(tech));
+      .filter(node => node.getData("tier") === tier && node.getData("category") === techCategory);
     
     const y = sameTierTechs.length * this.NODE_SPACING_Y + 50;
     
     container.setPosition(x, y);
     container.setData("tier", tier);
     container.setData("techId", tech.id);
-    container.setData("category", this.getTechCategory(tech));
+    container.setData("category", techCategory);
     
     // Background with category color
-    const categoryColor = this.CATEGORY_COLORS[this.getTechCategory(tech)];
+    const categoryColor = this.CATEGORY_COLORS[techCategory as CategoryType];
     const alpha = tech.researched ? 0.5 : 0.8;
     const bg = this.scene.add.rectangle(
       0, 0,
@@ -615,10 +621,10 @@ export class EnhancedTechTreePanel {
   /**
    * Determine the category of a technology based on its effects and ID
    */
-  private getTechCategory(tech: TechInfo): string {
+  private getTechCategory(tech: TechInfo): CategoryType {
     // Check faction-specific special techs first
-    if (tech.faction && tech.id.includes("Title") || tech.id.includes("Record") || 
-        tech.id.includes("Alliance") || tech.id.includes("Prophecy")) {
+    if (tech.faction && (tech.id.includes("Title") || tech.id.includes("Record") || 
+        tech.id.includes("Alliance") || tech.id.includes("Prophecy"))) {
       return "special";
     }
     
