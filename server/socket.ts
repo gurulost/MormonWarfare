@@ -11,7 +11,26 @@ export class SocketServer {
   private pingInterval: NodeJS.Timeout | null = null;
   
   constructor(server: Server) {
-    this.wss = new WebSocketServer({ server });
+    // Use a specific path for our game WebSockets to avoid conflicts with Vite
+    this.wss = new WebSocketServer({ 
+      server,
+      path: "/gameserver", // Use a specific path for our game WebSockets
+      // Add error handling for WebSocket server
+      clientTracking: true,
+      perMessageDeflate: {
+        zlibDeflateOptions: {
+          chunkSize: 1024,
+          memLevel: 7,
+          level: 3
+        },
+        zlibInflateOptions: {
+          chunkSize: 10 * 1024
+        },
+        concurrencyLimit: 10,
+        threshold: 1024
+      }
+    });
+    
     this.rooms = new Map();
     
     // Create tick manager for optimized game state updates
@@ -19,6 +38,11 @@ export class SocketServer {
     
     this.setupSocketServer();
     this.startPingInterval();
+    
+    // Add error handler for the WebSocket server
+    this.wss.on('error', (error) => {
+      console.error('WebSocket Server Error:', error);
+    });
   }
   
   private setupSocketServer() {

@@ -52,7 +52,8 @@ export const useMultiplayer = create<MultiplayerState>((set, get) => ({
       // Create actual WebSocket connection (use secure connection if in production)
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = window.location.host;
-      const socket = new WebSocket(`${protocol}//${host}`);
+      // Use the specific path that matches our server WebSocket configuration
+      const socket = new WebSocket(`${protocol}//${host}/gameserver`);
       
       socket.onopen = () => {
         console.log("WebSocket connection established");
