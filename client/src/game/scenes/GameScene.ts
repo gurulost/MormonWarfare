@@ -604,12 +604,18 @@ export class GameScene extends Phaser.Scene {
         const targetX = Math.floor(pointer.worldX / TILE_SIZE);
         const targetY = Math.floor(pointer.worldY / TILE_SIZE);
         
-        // Check if clicked on a resource
-        if (this.map[targetY][targetX].resource) {
-          this.unitManager.orderUnitsToGatherResource(this.selectedUnits, targetX, targetY);
+        // Check if the coordinates are within the map boundaries
+        if (targetX >= 0 && targetX < MAP_SIZE && targetY >= 0 && targetY < MAP_SIZE && 
+            this.map && this.map[targetY] && this.map[targetY][targetX]) {
+          // Check if clicked on a resource
+          if (this.map[targetY][targetX].resource) {
+            this.unitManager.orderUnitsToGatherResource(this.selectedUnits, targetX, targetY);
+          } else {
+            // Move units to target position
+            this.unitManager.moveUnitsTo(this.selectedUnits, targetX, targetY);
+          }
         } else {
-          // Move units to target position
-          this.unitManager.moveUnitsTo(this.selectedUnits, targetX, targetY);
+          console.log("Clicked outside map boundaries or invalid map data");
         }
       }
     });

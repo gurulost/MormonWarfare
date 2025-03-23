@@ -26,6 +26,12 @@ export class PathfindingManager {
       return [];
     }
     
+    // Check if the map and target position are valid
+    if (!map || !map[targetY] || !map[targetY][targetX]) {
+      console.error("Invalid map or target position in findPath");
+      return [];
+    }
+
     // If target is not walkable, find nearest walkable tile
     if (!map[targetY][targetX].walkable) {
       const nearestWalkable = this.findNearestWalkableTile(targetX, targetY, map);
@@ -178,6 +184,12 @@ export class PathfindingManager {
     // Base cost (1 for orthogonal, 1.4 for diagonal)
     const isDiagonal = x1 !== x2 && y1 !== y2;
     let cost = isDiagonal ? 1.4 : 1;
+    
+    // Safety check
+    if (!map || !map[y2] || !map[y2][x2]) {
+      console.error(`Invalid map access at (${x2},${y2}) in movementCost`);
+      return cost;
+    }
     
     // Additional cost based on terrain
     const terrain = map[y2][x2].type;
