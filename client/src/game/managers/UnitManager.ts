@@ -199,6 +199,12 @@ export class UnitManager {
       map = this.scene.game.registry.get("map") || [];
     }
     
+    // Add extra safety checks for map access
+    if (!map || !map[targetY] || !map[targetY][targetX]) {
+      console.error(`Invalid map data for target position: ${targetX}, ${targetY}`);
+      return;
+    }
+    
     if (!map[targetY][targetX].walkable) {
       console.warn(`Target position is not walkable: ${targetX}, ${targetY}`);
       return;
@@ -482,7 +488,13 @@ export class UnitManager {
       map = this.scene.game.registry.get("map") || [];
     }
     
-    return map[y][x].walkable;
+    // Add safety check for map access
+    if (!map || !map[y] || !map[y][x]) {
+      console.error(`Invalid map data for position: ${x}, ${y}`);
+      return false;
+    }
+    
+    return !!map[y][x].walkable;
   }
   
   /**
@@ -522,6 +534,12 @@ export class UnitManager {
     } else {
       // Fallback to registry
       map = this.scene.game.registry.get("map") || [];
+    }
+    
+    // Add safety check for map access
+    if (!map || !map[tileY] || !map[tileY][tileX]) {
+      console.error(`Invalid map data for resource position: ${tileX}, ${tileY}`);
+      return;
     }
     
     if (!map[tileY][tileX].resource) {
@@ -594,6 +612,13 @@ export class UnitManager {
       if (path.length > 0) {
         unit.setPath(path);
       }
+      return;
+    }
+    
+    // Add safety check for map access
+    if (!map || !map[tileY] || !map[tileY][tileX]) {
+      console.error(`Invalid map data for resource position: ${tileX}, ${tileY}`);
+      unit.stopGathering();
       return;
     }
     
@@ -924,6 +949,11 @@ export class UnitManager {
           
           // Check if valid position
           if (testX >= 0 && testX < MAP_SIZE && testY >= 0 && testY < MAP_SIZE) {
+            // Add safety check for map access
+            if (!map[testY] || !map[testY][testX]) {
+              continue;
+            }
+            
             // Check if this tile has a resource of the desired type
             if (map[testY][testX].resource && map[testY][testX].resource.type === resourceType) {
               return { x: testX, y: testY };

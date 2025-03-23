@@ -75,11 +75,24 @@ export class BuildingManager {
     if (type === "cityCenter") size = 3;
     else if (type === "wall") size = 1;
     
+    // Add safety check for map
+    if (!map || !Array.isArray(map) || map.length === 0) {
+      console.error("Invalid map data when creating building");
+      return null;
+    }
+    
     // Check area
     for (let ty = y - Math.floor(size/2); ty <= y + Math.floor(size/2); ty++) {
       for (let tx = x - Math.floor(size/2); tx <= x + Math.floor(size/2); tx++) {
-        if (ty < 0 || ty >= map.length || tx < 0 || tx >= map[0].length || !map[ty][tx].walkable) {
-          console.warn(`Cannot create building at invalid position: ${x}, ${y}`);
+        // Check if map index is valid
+        if (ty < 0 || ty >= map.length || tx < 0 || !map[ty] || tx >= map[ty].length) {
+          console.warn(`Cannot create building at invalid position: ${x}, ${y} - Out of bounds`);
+          return null;
+        }
+        
+        // Check if the tile at this position exists and is walkable
+        if (!map[ty][tx] || !map[ty][tx].walkable) {
+          console.warn(`Cannot create building at invalid position: ${x}, ${y} - Tile not walkable`);
           return null;
         }
       }
@@ -208,8 +221,14 @@ export class BuildingManager {
       const x = buildingX + offset.x;
       const y = buildingY + offset.y;
       
+      // Add safety check for map
+      if (!map || !Array.isArray(map) || map.length === 0 || !map[0]) {
+        console.error("Invalid map data when placing produced unit");
+        return;
+      }
+      
       // Check if position is valid and walkable
-      if (x >= 0 && x < map[0].length && y >= 0 && y < map.length && map[y][x].walkable) {
+      if (x >= 0 && y >= 0 && y < map.length && map[y] && x < map[y].length && map[y][x] && map[y][x].walkable) {
         // Create the unit
         this.unitManager.createUnit(building.playerId, unitType as any, x, y);
         
