@@ -949,4 +949,133 @@ export class GameScene extends Phaser.Scene {
   getSelectedUnits(): string[] {
     return this.selectedUnits;
   }
+  
+  // Method to select a unit by ID - added for 3D view interaction
+  selectUnitById(unitId: string): void {
+    // Clear current selection if not shift key held
+    if (!this.input.keyboard.isDown(Phaser.Input.Keyboard.KeyCodes.SHIFT)) {
+      this.selectedUnits = [];
+    }
+    
+    // Find the unit
+    const unit = this.unitManager.getUnit(unitId);
+    if (unit && unit.playerId === this.localPlayerId) {
+      // Add to selection if not already selected
+      if (!this.selectedUnits.includes(unitId)) {
+        this.selectedUnits.push(unitId);
+        unit.setSelected(true);
+      }
+      
+      // Update UI
+      this.gameUI.updateSelection(this.selectedUnits);
+    }
+  }
+  
+  // Method to move selected units - added for 3D view interaction
+  moveSelectedUnitsTo(unitIds: string[], targetX: number, targetY: number): void {
+    // Validate coordinates
+    if (targetX < 0 || targetX >= this.map.length || targetY < 0 || targetY >= this.map[0].length) {
+      console.warn("Invalid target position in moveSelectedUnitsTo");
+      return;
+    }
+    
+    // Check if tile is walkable
+    if (!this.map[targetY][targetX].walkable) {
+      console.warn("Target position is not walkable");
+      return;
+    }
+    
+    // Move the units
+    this.unitManager.moveUnitsTo(unitIds, targetX, targetY);
+  }
+  
+  // Method to start building placement mode - added for 3D view interaction
+  startBuildingPlacement(type: string): void {
+    // Check if player has enough resources
+    const buildingCost = this.resourceManager.getBuildingCost(type);
+    if (!this.resourceManager.hasEnoughResources(
+      this.localPlayerId, 
+      buildingCost.food, 
+      buildingCost.ore
+    )) {
+      console.warn("Not enough resources to build " + type);
+      return;
+    }
+    
+    // Get player faction
+    const playerData = this.players.find(p => p.id === this.localPlayerId);
+    if (!playerData) {
+      console.warn("Player data not found");
+      return;
+    }
+    
+    // Need to implement the actual building placement logic
+    // This would typically involve showing a preview of the building
+    // and allowing the player to click to place it
+    
+    console.log(`Starting building placement for ${type}`);
+    
+    // For now, just place the building at a random valid location
+    // This should be replaced with proper UI for placement
+    let placed = false;
+    let attempts = 0;
+    const maxAttempts = 50;
+    
+    while (!placed && attempts < maxAttempts) {
+      attempts++;
+      
+      // Get a random position near the player's existing buildings
+      const playerBuildings = this.buildingManager.getBuildingsByPlayer(this.localPlayerId);
+      let x = 0;
+      let y = 0;
+      
+      if (playerBuildings.length > 0) {
+        // Use an existing building as a reference point
+        const referenceBuilding = playerBuildings[0];
+        x = referenceBuilding.x + Math.floor(Math.random() * 10) - 5;
+        y = referenceBuilding.y + Math.floor(Math.random() * 10) - 5;
+      } else {
+        // If no buildings, use a unit as reference
+        const playerUnits = this.unitManager.getUnitsByPlayer(this.localPlayerId);
+        if (playerUnits.length > 0) {
+          const referenceUnit = playerUnits[0];
+          x = referenceUnit.x + Math.floor(Math.random() * 5) - 2;
+          y = referenceUnit.y + Math.floor(Math.random() * 5) - 2;
+        } else {
+          // If no units either, use a random position
+          x = Math.floor(Math.random() * this.map.length);
+          y = Math.floor(Math.random() * this.map[0].length);
+        }
+      }
+      
+      // Make sure coordinates are valid
+      x = Math.max(0, Math.min(x, this.map.length - 1));
+      y = Math.max(0, Math.min(y, this.map[0].length - 1));
+      
+      // Check if the location is valid for building
+      if (this.map[y][x].walkable && !this.map[y][x].resource) {
+        // Create the building
+        const building = this.buildingManager.createBuilding(
+          this.localPlayerId,
+          type as any, // Type assertion because TypeScript doesn't know our specific types
+          x,
+          y,
+          playerData.faction
+        );
+        
+        if (building) {
+          // Deduct resources
+          this.resourceManager.removeResource(this.localPlayerId, "food", buildingCost.food);
+          this.resourceManager.removeResource(this.localPlayerId, "ore", buildingCost.ore);
+          placed = true;
+          
+          console.log(`Building ${type} placed at ${x},${y}`);
+        }
+      }
+    }
+    
+    if (!placed) {
+      console.warn(`Could not find a valid location to place ${type} after ${maxAttempts} attempts`);
+    }
+  }
 }

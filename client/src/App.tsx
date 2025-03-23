@@ -6,6 +6,7 @@ import { LobbyScene } from "./game/scenes/LobbyScene";
 import { GameScene } from "./game/scenes/GameScene";
 import "@fontsource/inter";
 import { useMultiplayer } from "./lib/stores/useMultiplayer";
+import GameContainer from "./components/GameContainer";
 
 // Main App component
 function App() {
@@ -45,6 +46,8 @@ function App() {
         min: 30,
         target: 60,
       },
+      transparent: true, // Make the canvas transparent to allow React components to overlay
+      backgroundColor: 'rgba(0,0,0,0)' // Transparent background
     };
 
     // Create the game instance
@@ -60,9 +63,12 @@ function App() {
   }, [connectToServer]);
 
   return (
-    <div className="w-full h-full">
-      {/* Game container */}
-      <div id="game-container" className="w-full h-full"></div>
+    <div className="w-full h-full relative overflow-hidden">
+      {/* Game container for Phaser canvas */}
+      <div id="game-container" className="w-full h-full absolute top-0 left-0 z-0"></div>
+      
+      {/* Our React Game Container with UI overlays and 3D rendering */}
+      {game && <GameContainer gameInstance={game} />}
       
       {/* Audio elements for sound effects */}
       <audio id="background-music" src="/sounds/background.mp3" loop preload="auto"></audio>

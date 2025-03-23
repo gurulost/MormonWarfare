@@ -1,16 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useGame } from "../../lib/stores/useGame";
-import { 
-  Button,
-  Card,
-  ScrollArea,
-  Separator,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger
-} from "..";
+import { Button } from "../ui/button";
+import { Card } from "../ui/card";
+import { ScrollArea } from "../ui/scroll-area";
+import { Separator } from "../ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 
 // Icons
 import { 
