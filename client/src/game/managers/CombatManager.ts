@@ -7,7 +7,18 @@ import {
   WEAKNESS_DAMAGE_MULTIPLIER,
   UNIT_STATS
 } from "../config";
+import { UnitStats, UnitType } from "../types";
 import { useAudio } from "../../lib/stores/useAudio";
+
+// Type for game Unit that includes position and other essential properties
+interface GameUnit {
+  id: string;
+  playerId: string;
+  type: UnitType;
+  x: number;
+  y: number;
+  range: number;
+}
 
 export class CombatManager {
   private scene: Phaser.Scene;
@@ -123,7 +134,7 @@ export class CombatManager {
   /**
    * Creates a death effect when a unit is killed
    */
-  private createDeathEffect(x: number, y: number, unitType: string): void {
+  private createDeathEffect(x: number, y: number, unitType: UnitType): void {
     // Create particles for death effect
     const particles = this.scene.add.particles(x, y, 'particle', {
       speed: { min: 50, max: 150 },
@@ -171,8 +182,8 @@ export class CombatManager {
     // Apply counter system bonuses if both units are combat units
     if (attacker && defender) {
       // Get unit types
-      const attackerType = attacker.type;
-      const defenderType = defender.type;
+      const attackerType = attacker.type as UnitType;
+      const defenderType = defender.type as UnitType;
       
       // Check for counter bonus
       if (this.isCounterUnit(attackerType, defenderType)) {
@@ -212,23 +223,23 @@ export class CombatManager {
   /**
    * Determines if unitType has a counter advantage against targetType
    */
-  private isCounterUnit(unitType: string, targetType: string): boolean {
+  private isCounterUnit(unitType: UnitType, targetType: UnitType): boolean {
     // Get unit stats
-    const stats = UNIT_STATS[unitType as keyof typeof UNIT_STATS];
+    const stats = UNIT_STATS[unitType] as UnitStats;
     
     // Check if this unit type has counters and if targetType is in the list
-    return !!(stats && stats.counters && stats.counters.includes(targetType));
+    return !!(stats?.counters && stats.counters.includes(targetType));
   }
   
   /**
    * Determines if unitType is weak against targetType
    */
-  private isWeakToUnit(unitType: string, targetType: string): boolean {
+  private isWeakToUnit(unitType: UnitType, targetType: UnitType): boolean {
     // Get unit stats
-    const stats = UNIT_STATS[unitType as keyof typeof UNIT_STATS];
+    const stats = UNIT_STATS[unitType] as UnitStats;
     
     // Check if this unit type has weaknesses and if targetType is in the list
-    return !!(stats && stats.weakTo && stats.weakTo.includes(targetType));
+    return !!(stats?.weakTo && stats.weakTo.includes(targetType));
   }
   
   /**
@@ -293,7 +304,7 @@ export class CombatManager {
       }
     }
   }
-  
+
   private findNearestEnemyUnit(unit: any, allUnits: any[]): any | null {
     let nearestEnemy = null;
     let nearestDistance = Infinity;

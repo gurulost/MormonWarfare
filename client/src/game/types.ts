@@ -35,6 +35,19 @@ export interface GameData {
   map: string;
 }
 
+export interface UnitStats {
+  health: number;
+  attack: number;
+  defense: number;
+  range: number;
+  speed: number;
+  cost: { food: number; ore: number };
+  description: string;
+  role: string;
+  counters?: UnitType[];
+  weakTo?: UnitType[];
+}
+
 export interface UnitData {
   id: string;
   type: UnitType;
