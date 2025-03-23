@@ -329,7 +329,7 @@ export class LobbyScene extends Phaser.Scene {
   }
   
   private startGame() {
-    console.log("Starting game...");
+    console.log("Starting game with players:", this.players);
     
     // Prepare game data
     const gameData = {
@@ -338,8 +338,8 @@ export class LobbyScene extends Phaser.Scene {
       map: "standard" // Default map
     };
     
-    // Start the game scene
-    this.scene.start("GameScene", { gameData });
+    // Start the game scene (not solo mode)
+    this.scene.start("GameScene", { gameData, isSolo: false });
   }
   
   private setupMultiplayerListeners() {
