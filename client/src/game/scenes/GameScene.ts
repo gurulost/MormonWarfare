@@ -130,52 +130,238 @@ export class GameScene extends Phaser.Scene {
     const groundLayer = this.add.group();
     const resourceLayer = this.add.group();
     
-    // Generate terrain
+    // Create a base map filled with grass
     for (let y = 0; y < MAP_SIZE; y++) {
       this.map[y] = [];
       for (let x = 0; x < MAP_SIZE; x++) {
-        // Determine terrain type (grass is default)
-        let terrainType: 'grass' | 'forest' | 'hills' | 'water' = 'grass';
-        
-        // Create simple terrain patterns
-        const noise = Math.random();
-        if (noise < 0.1) {
-          terrainType = 'water';
-        } else if (noise < 0.3) {
-          terrainType = 'forest';
-        } else if (noise < 0.4) {
-          terrainType = 'hills';
-        }
-        
-        // Create tile sprite
-        let tileColor = 0x44aa44; // grass
-        if (terrainType === 'forest') tileColor = 0x228822;
-        if (terrainType === 'hills') tileColor = 0x888888;
-        if (terrainType === 'water') tileColor = 0x2288aa;
-        
-        const tile = this.add.rectangle(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE, tileColor)
-          .setOrigin(0, 0)
-          .setStrokeStyle(1, 0x000000, 0.2);
-        
-        groundLayer.add(tile);
-        
-        // Store tile data
+        // Initialize with grass
         this.map[y][x] = {
           x,
           y,
-          type: terrainType,
-          walkable: terrainType !== 'water',
+          type: 'grass',
+          walkable: true,
           resource: null
         };
+      }
+    }
+
+    // Generate water bodies (lakes/rivers)
+    this.generateWaterBodies();
+    
+    // Generate forest clusters
+    this.generateForestClusters();
+    
+    // Generate hill regions
+    this.generateHillRegions();
+    
+    // Add resource nodes
+    this.addResourceNodes();
+    
+    // Create visual representation of the map
+    for (let y = 0; y < MAP_SIZE; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        const tile = this.map[y][x];
+        let tileColor = 0x44aa44; // grass
         
-        // Add resources with some probability
-        if (terrainType !== 'water') {
-          if (terrainType === 'forest' && Math.random() < 0.4) {
-            this.addResource(x, y, 'food');
-          } else if (terrainType === 'hills' && Math.random() < 0.6) {
-            this.addResource(x, y, 'ore');
+        if (tile.type === 'forest') tileColor = 0x228822;
+        if (tile.type === 'hills') tileColor = 0x888888;
+        if (tile.type === 'water') tileColor = 0x2288aa;
+        
+        const tileSprite = this.add.rectangle(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE, tileColor)
+          .setOrigin(0, 0)
+          .setStrokeStyle(1, 0x000000, 0.2);
+        
+        groundLayer.add(tileSprite);
+        
+        // Draw resource indicators
+        if (tile.resource) {
+          const resourceType = tile.resource.type;
+          this.addResource(x, y, resourceType);
+        }
+      }
+    }
+    
+    console.log("Map generated successfully");
+  }
+  
+  private generateWaterBodies() {
+    // Create a few lakes
+    const numLakes = 3 + Math.floor(Math.random() * 3); // 3-5 lakes
+    
+    for (let i = 0; i < numLakes; i++) {
+      const centerX = 10 + Math.floor(Math.random() * (MAP_SIZE - 20)); // Avoid edges
+      const centerY = 10 + Math.floor(Math.random() * (MAP_SIZE - 20));
+      const size = 3 + Math.floor(Math.random() * 4); // Lake size 3-6
+      
+      // Create roughly circular lake
+      for (let y = centerY - size; y <= centerY + size; y++) {
+        for (let x = centerX - size; x <= centerX + size; x++) {
+          if (x >= 0 && x < MAP_SIZE && y >= 0 && y < MAP_SIZE) {
+            // Distance from center
+            const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+            
+            // Irregular circle with some randomness
+            if (distance <= size * (0.7 + Math.random() * 0.3)) {
+              this.map[y][x].type = 'water';
+              this.map[y][x].walkable = false;
+            }
           }
         }
+      }
+    }
+    
+    // Create a river or two
+    const numRivers = 1 + Math.floor(Math.random() * 2); // 1-2 rivers
+    
+    for (let i = 0; i < numRivers; i++) {
+      let x = Math.random() < 0.5 ? 0 : MAP_SIZE - 1; // Start at left or right edge
+      let y = 5 + Math.floor(Math.random() * (MAP_SIZE - 10)); // Random y position not too close to edge
+      
+      const horizontal = x === 0; // Direction of flow
+      const riverLength = MAP_SIZE - 10 - Math.floor(Math.random() * 20); // River length
+      const turns = 3 + Math.floor(Math.random() * 4); // Number of direction changes
+      
+      // For each segment of the river
+      for (let segment = 0; segment < turns; segment++) {
+        const segmentLength = Math.floor(riverLength / turns);
+        let isHorizontal = segment % 2 === 0 ? horizontal : !horizontal;
+        const direction = isHorizontal ? { x: 1, y: 0 } : { x: 0, y: 1 };
+        
+        // Add a bit of meandering
+        const meander = { x: 0, y: 0 };
+        
+        // Draw the river segment
+        for (let j = 0; j < segmentLength; j++) {
+          // Apply meandering (slight change in direction)
+          if (j % 3 === 0) {
+            meander.x = isHorizontal ? 0 : (Math.random() < 0.5 ? -1 : 1);
+            meander.y = isHorizontal ? (Math.random() < 0.5 ? -1 : 1) : 0;
+          }
+          
+          // Calculate new position
+          x += direction.x + meander.x * 0.3;
+          y += direction.y + meander.y * 0.3;
+          
+          // Ensure within bounds
+          x = Math.max(0, Math.min(MAP_SIZE - 1, Math.floor(x)));
+          y = Math.max(0, Math.min(MAP_SIZE - 1, Math.floor(y)));
+          
+          // Mark as water
+          this.map[y][x].type = 'water';
+          this.map[y][x].walkable = false;
+          
+          // Add some width to the river
+          for (let w = -1; w <= 1; w++) {
+            const nx = x + (isHorizontal ? 0 : w);
+            const ny = y + (isHorizontal ? w : 0);
+            
+            if (nx >= 0 && nx < MAP_SIZE && ny >= 0 && ny < MAP_SIZE) {
+              // Thinner at the edges with probability
+              if (w === 0 || Math.random() < 0.7) {
+                this.map[ny][nx].type = 'water';
+                this.map[ny][nx].walkable = false;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  private generateForestClusters() {
+    const numForestClusters = 4 + Math.floor(Math.random() * 4); // 4-7 forest clusters
+    
+    for (let i = 0; i < numForestClusters; i++) {
+      const centerX = 5 + Math.floor(Math.random() * (MAP_SIZE - 10));
+      const centerY = 5 + Math.floor(Math.random() * (MAP_SIZE - 10));
+      const size = 4 + Math.floor(Math.random() * 5); // Forest size 4-8
+      
+      // Create forest cluster
+      for (let y = centerY - size; y <= centerY + size; y++) {
+        for (let x = centerX - size; x <= centerX + size; x++) {
+          if (x >= 0 && x < MAP_SIZE && y >= 0 && y < MAP_SIZE) {
+            // Distance from center with some noise
+            const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2)) 
+                            + Math.random() * 2 - 1;
+            
+            // Only change to forest if the tile is currently grass
+            if (distance <= size * 0.8 && this.map[y][x].type === 'grass') {
+              // More dense near center, sparser at edges
+              if (distance < size * 0.4 || Math.random() < 0.7) {
+                this.map[y][x].type = 'forest';
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  private generateHillRegions() {
+    const numHillRegions = 3 + Math.floor(Math.random() * 3); // 3-5 hill regions
+    
+    for (let i = 0; i < numHillRegions; i++) {
+      const centerX = 5 + Math.floor(Math.random() * (MAP_SIZE - 10));
+      const centerY = 5 + Math.floor(Math.random() * (MAP_SIZE - 10));
+      const size = 3 + Math.floor(Math.random() * 4); // Hill size 3-6
+      
+      // Create hill region
+      for (let y = centerY - size; y <= centerY + size; y++) {
+        for (let x = centerX - size; x <= centerX + size; x++) {
+          if (x >= 0 && x < MAP_SIZE && y >= 0 && y < MAP_SIZE) {
+            // Distance from center with some noise for irregular shape
+            const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2)) 
+                            + Math.random() * 1.5 - 0.75;
+            
+            // Only change to hills if the tile is currently grass
+            if (distance <= size * 0.7 && this.map[y][x].type === 'grass') {
+              this.map[y][x].type = 'hills';
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  private addResourceNodes() {
+    // Add food resources to some forest tiles
+    for (let y = 0; y < MAP_SIZE; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        if (this.map[y][x].type === 'forest' && Math.random() < 0.4) {
+          this.map[y][x].resource = {
+            type: 'food',
+            amount: 300 + Math.floor(Math.random() * 200) // 300-500 food
+          };
+        } else if (this.map[y][x].type === 'hills' && Math.random() < 0.6) {
+          this.map[y][x].resource = {
+            type: 'ore',
+            amount: 400 + Math.floor(Math.random() * 300) // 400-700 ore
+          };
+        }
+      }
+    }
+    
+    // Add a few strategic resource deposits in grass areas
+    const numStrategicDeposits = 5 + Math.floor(Math.random() * 6); // 5-10 strategic deposits
+    
+    for (let i = 0; i < numStrategicDeposits; i++) {
+      // Find a suitable grass tile that's not near the edge
+      let attempts = 0;
+      let x, y;
+      
+      do {
+        x = 10 + Math.floor(Math.random() * (MAP_SIZE - 20));
+        y = 10 + Math.floor(Math.random() * (MAP_SIZE - 20));
+        attempts++;
+      } while ((this.map[y][x].type !== 'grass' || this.map[y][x].resource !== null) && attempts < 100);
+      
+      if (attempts < 100) {
+        // Alternate between food and ore
+        const resourceType: ResourceType = i % 2 === 0 ? 'food' : 'ore';
+        this.map[y][x].resource = {
+          type: resourceType,
+          amount: 600 + Math.floor(Math.random() * 400) // 600-1000 resources (high value)
+        };
       }
     }
   }
@@ -367,9 +553,10 @@ export class GameScene extends Phaser.Scene {
   private updateMinimap() {
     this.minimap.clear();
     
-    // Draw terrain
-    const tileRatio = this.minimapSize / (MAP_SIZE * TILE_SIZE);
+    // Calculate minimap tile size
+    const miniTileSize = this.minimapSize / MAP_SIZE;
     
+    // Draw terrain
     for (let y = 0; y < MAP_SIZE; y++) {
       for (let x = 0; x < MAP_SIZE; x++) {
         const tile = this.map[y][x];
@@ -380,7 +567,6 @@ export class GameScene extends Phaser.Scene {
         if (tile.type === 'water') color = 0x2288aa;
         
         // Draw mini tile
-        const miniTileSize = this.minimapSize / MAP_SIZE;
         this.minimap.fillStyle(color);
         this.minimap.fillRect(
           x * miniTileSize,
