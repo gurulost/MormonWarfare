@@ -952,12 +952,9 @@ export class GameScene extends Phaser.Scene {
   
   // Method to select a unit by ID - added for 3D view interaction
   selectUnitById(unitId: string): void {
-    // Clear current selection if not shift key held
-    const shiftKey = Phaser.Input.Keyboard.KeyCodes.SHIFT;
-    const keyboardPlugin = this.input.keyboard;
-    if (keyboardPlugin && !keyboardPlugin.checkDown(shiftKey)) {
-      this.selectedUnits = [];
-    }
+    // Skip multi-select check in 3D view since we can't easily check shift key from ThreeJS
+    // Just clear selection every time for now
+    this.selectedUnits = [];
     
     // Find the unit
     const unit = this.unitManager.getUnit(unitId);

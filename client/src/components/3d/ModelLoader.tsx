@@ -1,9 +1,10 @@
 import { useRef, useEffect, useState, Suspense } from "react";
 import { useFrame } from "@react-three/fiber";
-import { useKeyboardControls, OrbitControls, useGLTF } from "@react-three/drei";
+import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { GLTF } from "three-stdlib";
 
+// Type definitions
 export interface ModelLoaderProps {
   modelPath: string;
   scale?: [number, number, number];
@@ -12,6 +13,59 @@ export interface ModelLoaderProps {
   animate?: boolean;
 }
 
+// Helper function for model mapping
+export function getModelPathByType(
+  type: string, 
+  faction: "Nephites" | "Lamanites" | null = null
+): string {
+  // Unit models
+  if (type === "melee") {
+    return faction === "Nephites" 
+      ? "/models/nephite_warrior.glb" 
+      : "/models/lamanite_warrior.glb";
+  }
+  
+  if (type === "ranged") {
+    return faction === "Nephites" 
+      ? "/models/nephite_archer.glb" 
+      : "/models/lamanite_warrior.glb"; // Fallback to warrior for now
+  }
+  
+  if (type === "worker") {
+    return "/models/worker.glb";
+  }
+  
+  if (type === "hero") {
+    return faction === "Nephites" 
+      ? "/models/nephite_hero.glb" 
+      : "/models/lamanite_hero.glb";
+  }
+  
+  // Building models
+  if (type === "cityCenter") {
+    return faction === "Nephites" 
+      ? "/models/nephite_city_center.glb" 
+      : "/models/lamanite_city_center.glb";
+  }
+  
+  if (type === "barracks") {
+    return faction === "Nephites" 
+      ? "/models/nephite_barracks.glb" 
+      : "/models/lamanite_barracks.glb";
+  }
+  
+  if (type === "archeryRange") {
+    return faction === "Nephites" 
+      ? "/models/nephite_archery_range.glb" 
+      : "/models/lamanite_archery_range.glb";
+  }
+  
+  // Fallback to a default model
+  console.warn(`No model found for type: ${type}, faction: ${faction}. Using default model.`);
+  return "/models/worker.glb";
+}
+
+// The model loader component
 export function ModelLoader({
   modelPath,
   scale = [2.5, 2.5, 2.5],
@@ -69,56 +123,3 @@ export function ModelLoader({
     </group>
   );
 }
-
-// Helper function for model mapping
-// Note: Using function declaration instead of arrow function for consistent HMR
-export function getModelPathByType(
-  type: string, 
-  faction: "Nephites" | "Lamanites" | null = null
-): string {
-  // Unit models
-  if (type === "melee") {
-    return faction === "Nephites" 
-      ? "/models/nephite_warrior.glb" 
-      : "/models/lamanite_warrior.glb";
-  }
-  
-  if (type === "ranged") {
-    return faction === "Nephites" 
-      ? "/models/nephite_archer.glb" 
-      : "/models/lamanite_warrior.glb"; // Fallback to warrior for now
-  }
-  
-  if (type === "worker") {
-    return "/models/worker.glb";
-  }
-  
-  if (type === "hero") {
-    return faction === "Nephites" 
-      ? "/models/nephite_hero.glb" 
-      : "/models/lamanite_hero.glb";
-  }
-  
-  // Building models
-  if (type === "cityCenter") {
-    return faction === "Nephites" 
-      ? "/models/nephite_city_center.glb" 
-      : "/models/lamanite_city_center.glb";
-  }
-  
-  if (type === "barracks") {
-    return faction === "Nephites" 
-      ? "/models/nephite_barracks.glb" 
-      : "/models/lamanite_barracks.glb";
-  }
-  
-  if (type === "archeryRange") {
-    return faction === "Nephites" 
-      ? "/models/nephite_archery_range.glb" 
-      : "/models/lamanite_archery_range.glb";
-  }
-  
-  // Fallback to a default model
-  console.warn(`No model found for type: ${type}, faction: ${faction}. Using default model.`);
-  return "/models/worker.glb";
-};
