@@ -4,6 +4,7 @@ import { BuildingType, FactionType } from "../types";
 import { UnitManager } from "./UnitManager";
 import { TILE_SIZE } from "../config";
 import { useMultiplayer } from "../../lib/stores/useMultiplayer";
+import { useAudio } from "../../lib/stores/useAudio";
 
 export class BuildingManager {
   private scene: Phaser.Scene;
@@ -25,16 +26,34 @@ export class BuildingManager {
     y: number,
     fromServer: boolean = false
   ): Building | null {
-    // Get faction from player ID
-    const players = this.scene.game.registry.get("players") || [];
-    const player = players.find((p: any) => p.id === playerId);
+    // Get faction from player ID - first try GameScene's getPlayers method
+    let faction: FactionType;
     
-    if (!player) {
-      console.error(`Could not find player with ID: ${playerId}`);
-      return null;
+    // Use the GameScene's getPlayers method if available (type assertion needed)
+    if (typeof (this.scene as any).getPlayers === 'function') {
+      const players = (this.scene as any).getPlayers() || [];
+      const player = players.find((p: any) => p.id === playerId);
+      
+      if (player) {
+        faction = player.faction;
+      } else {
+        console.error(`Could not find player with ID: ${playerId} in GameScene players`);
+        return null;
+      }
+    } else {
+      // Fallback to registry
+      const players = this.scene.game.registry.get("players") || [];
+      const player = players.find((p: any) => p.id === playerId);
+      
+      if (!player) {
+        console.error(`Could not find player with ID: ${playerId} in registry`);
+        return null;
+      }
+      
+      faction = player.faction as FactionType;
     }
     
-    const faction = player.faction as FactionType;
+    console.log(`Creating building for player ${playerId} with faction ${faction}`);
     
     // Ensure position is valid
     x = Math.floor(x);

@@ -773,6 +773,8 @@ export class GameScene extends Phaser.Scene {
   }
   
   private initializePlayersStartingEntities() {
+    console.log("Initializing player entities for players:", this.players);
+    
     // Determine starting positions for each player
     const startPositions = [
       { x: 5, y: 5 },
@@ -784,6 +786,9 @@ export class GameScene extends Phaser.Scene {
     for (let i = 0; i < this.players.length; i++) {
       const player = this.players[i];
       const startPos = startPositions[i];
+      
+      // Add extra logging to debug player object
+      console.log(`Setting up player ${i}:`, player);
       
       // Ensure this area is clear for starting
       for (let y = startPos.y - 2; y <= startPos.y + 2; y++) {
@@ -797,25 +802,30 @@ export class GameScene extends Phaser.Scene {
         }
       }
       
-      // Create starting resources
-      this.resourceManager.initializePlayerResources(player.id, player.faction);
-      
-      // Create city center
-      this.buildingManager.createBuilding(
-        player.id,
-        'cityCenter',
-        startPos.x,
-        startPos.y
-      );
-      
-      // Create initial workers
-      for (let w = 0; w < 3; w++) {
-        this.unitManager.createUnit(
+      // Create starting resources - make sure we have a valid faction
+      if (player && player.id && player.faction) {
+        // Create starting resources
+        this.resourceManager.initializePlayerResources(player.id, player.faction);
+        
+        // Create city center
+        this.buildingManager.createBuilding(
           player.id,
-          'worker',
-          startPos.x + Math.cos(w * 2.1) * 2,
-          startPos.y + Math.sin(w * 2.1) * 2
+          'cityCenter',
+          startPos.x,
+          startPos.y
         );
+        
+        // Create initial workers
+        for (let w = 0; w < 3; w++) {
+          this.unitManager.createUnit(
+            player.id,
+            'worker',
+            startPos.x + Math.cos(w * 2.1) * 2,
+            startPos.y + Math.sin(w * 2.1) * 2
+          );
+        }
+      } else {
+        console.error("Invalid player data:", player);
       }
     }
   }
