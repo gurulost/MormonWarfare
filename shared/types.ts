@@ -1,4 +1,6 @@
-import { FactionType } from "../client/src/game/types";
+// Re-export FactionType from game types to make it available in shared/types
+import { FactionType as GameFactionType } from "../client/src/game/types";
+export type FactionType = GameFactionType;
 
 export type GameEventType = 
   | "unitMove" 

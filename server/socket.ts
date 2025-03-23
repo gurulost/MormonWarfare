@@ -108,40 +108,66 @@ export class SocketServer {
   private handleMessage(ws: WebSocket, data: any) {
     const clientId = (ws as any).clientId;
     
-    // Handle different message types
-    switch (data.type) {
-      case "joinRoom":
-        this.handleJoinRoom(ws, clientId, data);
-        break;
+    // Import validation utilities
+    import('./lib/validation')
+      .then(({ getSchemaForMessageType, validateMessage }) => {
+        // Get the appropriate schema based on message type
+        const schema = getSchemaForMessageType(data.type, data.eventType);
         
-      case "leaveRoom":
-        this.handleLeaveRoom(clientId, data.roomCode);
-        break;
+        if (!schema) {
+          console.warn(`Unknown message type or event type: ${data.type} / ${data.eventType || 'undefined'}`);
+          this.sendError(ws, `Unknown message type or event type: ${data.type}`);
+          return;
+        }
         
-      case "updatePlayer":
-        this.handleUpdatePlayer(clientId, data);
-        break;
+        // Validate message against schema
+        const validationResult = validateMessage(data, schema);
         
-      case "startGame":
-        this.handleStartGame(clientId, data.roomCode);
-        break;
+        if (!validationResult.success) {
+          console.warn(`Validation error for ${data.type}: ${validationResult.error}`);
+          this.sendError(ws, `Validation error: ${validationResult.error}`);
+          return;
+        }
         
-      case "gameEvent":
-        this.handleGameEvent(clientId, data);
-        break;
-        
-      case "pong":
-        this.handlePongResponse(clientId, data);
-        break;
-        
-      case "reconnect":
-        this.handleReconnection(ws, clientId, data);
-        break;
-        
-      default:
-        console.warn(`Unknown message type: ${data.type}`);
-        this.sendError(ws, `Unknown message type: ${data.type}`);
-    }
+        // Handle different validated message types
+        switch (data.type) {
+          case "joinRoom":
+            this.handleJoinRoom(ws, clientId, data);
+            break;
+            
+          case "leaveRoom":
+            this.handleLeaveRoom(clientId, data.roomCode);
+            break;
+            
+          case "updatePlayer":
+            this.handleUpdatePlayer(clientId, data);
+            break;
+            
+          case "startGame":
+            this.handleStartGame(clientId, data.roomCode);
+            break;
+            
+          case "gameEvent":
+            this.handleGameEvent(clientId, data);
+            break;
+            
+          case "pong":
+            this.handlePongResponse(clientId, data);
+            break;
+            
+          case "reconnect":
+            this.handleReconnection(ws, clientId, data);
+            break;
+            
+          default:
+            console.warn(`Unknown message type: ${data.type}`);
+            this.sendError(ws, `Unknown message type: ${data.type}`);
+        }
+      })
+      .catch(error => {
+        console.error('Error during message validation:', error);
+        this.sendError(ws, 'Internal server error during message validation');
+      });
   }
   
   /**
