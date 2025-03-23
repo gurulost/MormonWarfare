@@ -167,8 +167,12 @@ export class UnitManager {
       return;
     }
     
-    // For each unit, calculate path and set it
-    unitIds.forEach(unitId => {
+    // Use a formation approach if multiple units are selected
+    if (unitIds.length > 1) {
+      this.moveUnitsInFormation(unitIds, targetX, targetY);
+    } else {
+      // Single unit - just move directly
+      const unitId = unitIds[0];
       const unit = this.units.get(unitId);
       if (unit) {
         // Cancel any current actions
@@ -191,7 +195,7 @@ export class UnitManager {
           unit.setPath(path);
         }
       }
-    });
+    }
     
     // If not from server and units belong to local player, send to server
     if (!fromServer && unitIds.length > 0) {
@@ -201,6 +205,265 @@ export class UnitManager {
         multiplayerStore.moveUnits(unitIds, targetX, targetY);
       }
     }
+  }
+  
+  /**
+   * Move units in a formation pattern appropriate for Book of Mormon battles
+   */
+  private moveUnitsInFormation(unitIds: string[], targetX: number, targetY: number) {
+    // Categorize units by type
+    const heroUnits: Unit[] = [];
+    const meleeUnits: Unit[] = [];
+    const rangedUnits: Unit[] = [];
+    const workerUnits: Unit[] = [];
+    
+    // Group units by type
+    unitIds.forEach(unitId => {
+      const unit = this.units.get(unitId);
+      if (unit) {
+        // Cancel any current actions
+        unit.stopGathering();
+        unit.stopAttacking();
+        
+        // Add to appropriate group
+        if (unit.type === "hero") {
+          heroUnits.push(unit);
+        } else if (unit.type === "melee") {
+          meleeUnits.push(unit);
+        } else if (unit.type === "ranged") {
+          rangedUnits.push(unit);
+        } else if (unit.type === "worker") {
+          workerUnits.push(unit);
+        }
+      }
+    });
+    
+    // Get formation pattern based on unit composition
+    const formationOffsets = this.getFormationOffsets(
+      heroUnits.length,
+      meleeUnits.length,
+      rangedUnits.length,
+      workerUnits.length
+    );
+    
+    // Apply the formation by assigning positions to units
+    let heroIndex = 0;
+    let meleeIndex = 0;
+    let rangedIndex = 0;
+    let workerIndex = 0;
+    
+    // First position hero units (in the center or front)
+    heroUnits.forEach(unit => {
+      if (heroIndex < formationOffsets.heroPositions.length) {
+        const offset = formationOffsets.heroPositions[heroIndex];
+        const destX = targetX + offset.x;
+        const destY = targetY + offset.y;
+        
+        if (this.isValidAndWalkablePosition(destX, destY)) {
+          this.setUnitPath(unit, destX, destY);
+        } else {
+          // Fall back to the target position if invalid
+          this.setUnitPath(unit, targetX, targetY);
+        }
+        
+        heroIndex++;
+      }
+    });
+    
+    // Position melee units (typically in front to protect others)
+    meleeUnits.forEach(unit => {
+      if (meleeIndex < formationOffsets.meleePositions.length) {
+        const offset = formationOffsets.meleePositions[meleeIndex];
+        const destX = targetX + offset.x;
+        const destY = targetY + offset.y;
+        
+        if (this.isValidAndWalkablePosition(destX, destY)) {
+          this.setUnitPath(unit, destX, destY);
+        } else {
+          // Try to find a nearby valid position
+          const alternatePos = this.findNearbyWalkablePosition(targetX, targetY, 3);
+          if (alternatePos) {
+            this.setUnitPath(unit, alternatePos.x, alternatePos.y);
+          } else {
+            this.setUnitPath(unit, targetX, targetY);
+          }
+        }
+        
+        meleeIndex++;
+      }
+    });
+    
+    // Position ranged units (typically behind melee units)
+    rangedUnits.forEach(unit => {
+      if (rangedIndex < formationOffsets.rangedPositions.length) {
+        const offset = formationOffsets.rangedPositions[rangedIndex];
+        const destX = targetX + offset.x;
+        const destY = targetY + offset.y;
+        
+        if (this.isValidAndWalkablePosition(destX, destY)) {
+          this.setUnitPath(unit, destX, destY);
+        } else {
+          // Try to find a nearby valid position
+          const alternatePos = this.findNearbyWalkablePosition(targetX, targetY, 4);
+          if (alternatePos) {
+            this.setUnitPath(unit, alternatePos.x, alternatePos.y);
+          } else {
+            this.setUnitPath(unit, targetX, targetY);
+          }
+        }
+        
+        rangedIndex++;
+      }
+    });
+    
+    // Position worker units (typically behind everyone else)
+    workerUnits.forEach(unit => {
+      if (workerIndex < formationOffsets.workerPositions.length) {
+        const offset = formationOffsets.workerPositions[workerIndex];
+        const destX = targetX + offset.x;
+        const destY = targetY + offset.y;
+        
+        if (this.isValidAndWalkablePosition(destX, destY)) {
+          this.setUnitPath(unit, destX, destY);
+        } else {
+          // Try to find a nearby valid position
+          const alternatePos = this.findNearbyWalkablePosition(targetX, targetY, 5);
+          if (alternatePos) {
+            this.setUnitPath(unit, alternatePos.x, alternatePos.y);
+          } else {
+            this.setUnitPath(unit, targetX, targetY);
+          }
+        }
+        
+        workerIndex++;
+      }
+    });
+  }
+  
+  /**
+   * Get appropriate formation offsets based on unit composition
+   */
+  private getFormationOffsets(numHeroes: number, numMelee: number, numRanged: number, numWorkers: number) {
+    const heroPositions: { x: number, y: number }[] = [];
+    const meleePositions: { x: number, y: number }[] = [];
+    const rangedPositions: { x: number, y: number }[] = [];
+    const workerPositions: { x: number, y: number }[] = [];
+    
+    // Position the hero units in the center or slightly forward
+    for (let i = 0; i < numHeroes; i++) {
+      heroPositions.push({ x: 0, y: -1 });
+    }
+    
+    // Position melee units in front, forming a line or arc
+    const meleeWidth = Math.min(numMelee, 7); // Limit width to 7 units
+    const meleeRows = Math.ceil(numMelee / meleeWidth);
+    
+    let meleeIndex = 0;
+    for (let row = 0; row < meleeRows; row++) {
+      const rowWidth = Math.min(meleeWidth, numMelee - (row * meleeWidth));
+      for (let col = 0; col < rowWidth; col++) {
+        const xOffset = (col - Math.floor(rowWidth / 2));
+        const yOffset = row - 1; // One row ahead of the target
+        meleePositions.push({ x: xOffset, y: yOffset });
+        meleeIndex++;
+      }
+    }
+    
+    // Position ranged units behind in an arc
+    const rangedWidth = Math.min(numRanged, 5); // Limit width to 5 units
+    const rangedRows = Math.ceil(numRanged / rangedWidth);
+    
+    let rangedIndex = 0;
+    for (let row = 0; row < rangedRows; row++) {
+      const rowWidth = Math.min(rangedWidth, numRanged - (row * rangedWidth));
+      for (let col = 0; col < rowWidth; col++) {
+        const xOffset = (col - Math.floor(rowWidth / 2));
+        const yOffset = row + 1; // One row behind the target
+        rangedPositions.push({ x: xOffset, y: yOffset });
+        rangedIndex++;
+      }
+    }
+    
+    // Position worker units at the back or sides
+    const workerWidth = Math.min(numWorkers, 3);
+    const workerRows = Math.ceil(numWorkers / workerWidth);
+    
+    let workerIndex = 0;
+    for (let row = 0; row < workerRows; row++) {
+      const rowWidth = Math.min(workerWidth, numWorkers - (row * workerWidth));
+      for (let col = 0; col < rowWidth; col++) {
+        const xOffset = (col - Math.floor(rowWidth / 2));
+        const yOffset = row + 2; // Two rows behind the target
+        workerPositions.push({ x: xOffset, y: yOffset });
+        workerIndex++;
+      }
+    }
+    
+    return {
+      heroPositions,
+      meleePositions,
+      rangedPositions,
+      workerPositions
+    };
+  }
+  
+  /**
+   * Set a unit's path to a destination
+   */
+  private setUnitPath(unit: Unit, destX: number, destY: number) {
+    const startX = Math.floor(unit.x / TILE_SIZE);
+    const startY = Math.floor(unit.y / TILE_SIZE);
+    
+    // If already at destination, do nothing
+    if (startX === destX && startY === destY) {
+      return;
+    }
+    
+    // Get path from pathfinding manager
+    const path = this.pathfindingManager.findPath(startX, startY, destX, destY);
+    
+    if (path.length > 0) {
+      unit.setPath(path);
+    }
+  }
+  
+  /**
+   * Check if position is valid and walkable
+   */
+  private isValidAndWalkablePosition(x: number, y: number): boolean {
+    if (x < 0 || y < 0 || x >= MAP_SIZE || y >= MAP_SIZE) {
+      return false;
+    }
+    
+    const map = this.scene.game.registry.get("map") || [];
+    return map[y][x].walkable;
+  }
+  
+  /**
+   * Find a nearby walkable position within a radius
+   */
+  private findNearbyWalkablePosition(centerX: number, centerY: number, maxRadius: number): { x: number, y: number } | null {
+    // Try concentric circles from the center
+    for (let radius = 1; radius <= maxRadius; radius++) {
+      // Check positions in a square around the center
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          // Skip if not on the perimeter of the square
+          if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) {
+            continue;
+          }
+          
+          const testX = centerX + dx;
+          const testY = centerY + dy;
+          
+          if (this.isValidAndWalkablePosition(testX, testY)) {
+            return { x: testX, y: testY };
+          }
+        }
+      }
+    }
+    
+    return null;
   }
   
   orderUnitsToGatherResource(unitIds: string[], tileX: number, tileY: number) {
