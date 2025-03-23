@@ -393,14 +393,17 @@ const CameraController = ({
       // Set target to map center
       target.set(mapSize / 2, 0, mapSize / 2);
       
-      // Position camera at a strategic angle
-      camera.position.set(mapSize * 0.3, mapSize * 0.5, mapSize * 0.8);
+      // Position camera at a fixed strategic angle (behind and above)
+      camera.position.set(mapSize / 2 - mapSize * 0.5, mapSize * 0.6, mapSize * 0.8);
       
       // Look at the center
       camera.lookAt(target);
       
       // Stop any ongoing rotation
       setCameraRotating(false);
+      
+      // Ensure rotation is disabled
+      controlsRef.current.enableRotate = false;
     }
   };
   
@@ -415,7 +418,18 @@ const CameraController = ({
       setStrategicView,
       resetCamera: () => {
         if (controlsRef.current) {
+          // Reset target to center of map
           controlsRef.current.target.set(mapSize / 2, 0, mapSize / 2);
+          
+          // Reset to initial strategic position
+          const camera = controlsRef.current.object;
+          camera.position.set(mapSize / 2 - mapSize * 0.5, mapSize * 0.6, mapSize * 0.8);
+          camera.lookAt(new THREE.Vector3(mapSize / 2, 0, mapSize / 2));
+          
+          // Ensure rotation is disabled
+          controlsRef.current.enableRotate = false;
+          
+          // Stop any rotation animation
           setCameraRotating(false);
         }
       }
@@ -453,19 +467,19 @@ const CameraController = ({
         />
       )}
       
-      {/* Enhanced controls with better constraints */}
+      {/* Fixed RTS camera controls - only allowing panning and zoom, no rotation */}
       <OrbitControls 
         ref={controlsRef}
         target={[mapSize / 2, 0, mapSize / 2]}
-        maxPolarAngle={Math.PI / 2 - 0.1} // Prevent going below ground
-        minPolarAngle={Math.PI / 12} // Prevent looking straight down from top - better for RTS
+        maxPolarAngle={Math.PI / 3} // Fixed angle for RTS view
+        minPolarAngle={Math.PI / 3} // Same as max to lock the vertical angle
+        enableRotate={false} // Disable rotation completely
         minDistance={5} // Minimum zoom distance
         maxDistance={mapSize * 1.2} // Maximum zoom distance
         enableDamping // Smooth movement
         dampingFactor={0.1}
-        rotateSpeed={0.7} // Slower rotation for better control
         zoomSpeed={0.8} // Adjusted zoom speed
-        panSpeed={0.8} // Adjusted pan speed
+        panSpeed={1.0} // Slightly increased pan speed
         screenSpacePanning={true} // More intuitive panning
       />
     </>
@@ -494,9 +508,10 @@ export const GameScene = ({
   // Map size calculation
   const mapSize = mapData.length;
   
-  // Camera positioning
+  // Fixed camera positioning for a consistent RTS view
   const cameraPosition = useMemo<[number, number, number]>(() => {
-    return [mapSize / 2, mapSize * 0.8, mapSize * 0.8];
+    // Position camera at classic RTS angle (behind and above)
+    return [mapSize / 2 - mapSize * 0.5, mapSize * 0.6, mapSize * 0.8];
   }, [mapSize]);
   
   // UI Controls for camera
@@ -684,7 +699,8 @@ export const GameScene = ({
               color: "#ddd"
             }}>
               <p>Tip: Use mouse wheel to zoom in/out</p>
-              <p>Right-click drag to rotate camera</p>
+              <p>Hold right-click and drag to pan camera</p>
+              <p>Camera angle is fixed for optimal RTS view</p>
             </div>
           </div>
         )}
