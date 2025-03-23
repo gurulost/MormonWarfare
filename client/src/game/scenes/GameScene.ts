@@ -93,7 +93,7 @@ export class GameScene extends Phaser.Scene {
     // Generate the map
     this.generateMap();
     
-    // Set up camera
+    // Set up camera with bounds (no zoom)
     this.cameras.main.setBounds(0, 0, MAP_SIZE * TILE_SIZE, MAP_SIZE * TILE_SIZE);
     
     // Create selection rectangle
@@ -121,6 +121,9 @@ export class GameScene extends Phaser.Scene {
     
     // Initialize starting units and buildings for each player
     this.initializePlayersStartingEntities();
+    
+    // Center camera on local player's city center
+    this.centerCameraOnPlayerCity();
     
     // Setup multiplayer event listeners
     this.setupMultiplayerEvents();
