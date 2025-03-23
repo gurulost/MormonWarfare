@@ -50,8 +50,8 @@ export class CombatManager {
         
         // Check if in range
         if (tileDistance <= unit.range) {
-          // Attack the target
-          const damage = this.calculateDamage(unit.attack, targetUnit.defense);
+          // Attack the target with the counter system
+          const damage = this.calculateDamage(unit.attack, targetUnit.defense, unit, targetUnit);
           const killed = targetUnit.takeDamage(damage);
           
           // Play hit sound
@@ -60,10 +60,19 @@ export class CombatManager {
             audioStore.playHit();
           }
           
+          // Create visual damage indicator
+          this.createDamageIndicator(targetUnit.x, targetUnit.y, damage);
+          
           // If target is killed, remove it
           if (killed) {
+            // Play death effect before removing
+            this.createDeathEffect(targetUnit.x, targetUnit.y, targetUnit.type);
+            
             this.unitManager.removeUnit(targetUnit.id);
             unit.stopAttacking();
+            
+            // Add exp to the unit that got the kill (could be used for veterancy system)
+            // unit.addExperience(10);
           }
         } else {
           // Move toward target
@@ -78,8 +87,57 @@ export class CombatManager {
       }
     }
     
-    // Automatically detect and engage nearby enemy units
+    // Automatically detect and engage nearby enemy units with strategic target selection
     this.autoEngageEnemies();
+  }
+  
+  /**
+   * Creates a visual damage indicator
+   */
+  private createDamageIndicator(x: number, y: number, damage: number): void {
+    // Create damage text that floats up and fades out
+    const text = this.scene.add.text(
+      x, 
+      y - 10, 
+      `${Math.round(damage)}`, 
+      { 
+        fontSize: "14px", 
+        color: "#ff6060",
+        stroke: "#000000",
+        strokeThickness: 2
+      }
+    );
+    
+    // Animate the damage text
+    this.scene.tweens.add({
+      targets: text,
+      y: y - 40,
+      alpha: 0,
+      duration: 800,
+      onComplete: () => {
+        text.destroy();
+      }
+    });
+  }
+  
+  /**
+   * Creates a death effect when a unit is killed
+   */
+  private createDeathEffect(x: number, y: number, unitType: string): void {
+    // Create particles for death effect
+    const particles = this.scene.add.particles(x, y, 'particle', {
+      speed: { min: 50, max: 150 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 1, end: 0 },
+      lifespan: 800,
+      blendMode: 'ADD',
+      tint: unitType === 'worker' ? 0xffff00 : 0xff0000
+    });
+    
+    // Auto-destroy the emitter after it's done
+    this.scene.time.delayedCall(800, () => {
+      particles.destroy();
+    });
   }
   
   orderAttack(attackerIds: string[], targetId: string) {

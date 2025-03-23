@@ -1,6 +1,12 @@
 import Phaser from "phaser";
 import { FactionType, ResourceType } from "../types";
 import { useMultiplayer } from "../../lib/stores/useMultiplayer";
+import { 
+  RESOURCE_GATHER_RATE, 
+  RESOURCE_DECAY_RATE, 
+  RESOURCE_CARRY_CAPACITY,
+  FACTION_GATHER_BONUSES 
+} from "../config";
 
 export class ResourceManager {
   private scene: Phaser.Scene;
@@ -162,5 +168,59 @@ export class ResourceManager {
     }
     
     return { food: 0, ore: 0 };
+  }
+  
+  /**
+   * Apply faction-specific bonuses to resource gathering
+   * @param playerId Player's ID
+   * @param resourceType Type of resource being gathered
+   * @param baseAmount Base amount without bonuses
+   * @returns Final amount after applying bonuses
+   */
+  applyFactionGatheringBonuses(playerId: string, resourceType: ResourceType, baseAmount: number): number {
+    // Get the player's faction
+    const players = this.scene.registry.get("players") || [];
+    const player = players.find((p: any) => p.id === playerId);
+    
+    if (!player) return baseAmount;
+    
+    const faction = player.faction as FactionType;
+    
+    // Apply faction-specific bonuses from config
+    if (faction && FACTION_GATHER_BONUSES[faction]) {
+      const bonus = FACTION_GATHER_BONUSES[faction][resourceType];
+      if (bonus) {
+        const adjustedAmount = Math.round(baseAmount * bonus);
+        console.log(`Applied ${faction} gathering bonus for ${resourceType}: ${baseAmount} → ${adjustedAmount}`);
+        return adjustedAmount;
+      }
+    }
+    
+    return baseAmount;
+  }
+  
+  /**
+   * Gets the maximum amount of resources a unit can carry
+   * @param unitType Type of unit
+   * @returns Maximum carry capacity
+   */
+  getResourceCarryCapacity(unitType: string): number {
+    if (RESOURCE_CARRY_CAPACITY[unitType as keyof typeof RESOURCE_CARRY_CAPACITY]) {
+      return RESOURCE_CARRY_CAPACITY[unitType as keyof typeof RESOURCE_CARRY_CAPACITY];
+    }
+    
+    // Default capacity if not specified
+    return 10;
+  }
+  
+  /**
+   * Calculates resource depletion based on gathering
+   * @param currentAmount Current resource amount
+   * @returns Updated resource amount after depletion
+   */
+  calculateResourceDepletion(currentAmount: number): number {
+    // Apply decay rate
+    const newAmount = Math.max(0, currentAmount - (currentAmount * RESOURCE_DECAY_RATE));
+    return Math.floor(newAmount);
   }
 }

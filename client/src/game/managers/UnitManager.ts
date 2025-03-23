@@ -2,7 +2,13 @@ import Phaser from "phaser";
 import { Unit } from "../entities/Unit";
 import { UnitType, FactionType, ResourceType } from "../types";
 import { PathfindingManager } from "./PathfindingManager";
-import { TILE_SIZE, MAP_SIZE } from "../config";
+import { 
+  TILE_SIZE, 
+  MAP_SIZE, 
+  RESOURCE_GATHER_RATE,
+  RESOURCE_CARRY_CAPACITY,
+  FACTION_GATHER_BONUSES
+} from "../config";
 import { useMultiplayer } from "../../lib/stores/useMultiplayer";
 import { useAudio } from "../../lib/stores/useAudio";
 
@@ -729,16 +735,28 @@ export class UnitManager {
     if (!unit.carryingResource) {
       const resourceType = map[tileY][tileX].resource!.type;
       
-      // Update gathering rate based on faction bonuses
-      let gatherAmount = resourceType === 'food' ? 10 : 5; // Base gather rates
+      // Start with the base gather rate from config
+      let gatherAmount = RESOURCE_GATHER_RATE;
       
-      // Apply faction bonuses
-      if (unit.faction === "Nephites" && resourceType === "food") {
-        // Nephites are better at farming
-        gatherAmount += 2;
-      } else if (unit.faction === "Lamanites" && resourceType === "ore") {
-        // Lamanites are better at mining
-        gatherAmount += 2;
+      // Apply unit's gathering efficiency (can be improved with techs)
+      gatherAmount = Math.round(gatherAmount * unit.gatheringEfficiency);
+      
+      // Apply faction-specific bonuses from config
+      const resourceManager = this.scene.game.registry.get("resourceManager");
+      if (resourceManager) {
+        // Use the new bonus calculation system
+        gatherAmount = resourceManager.applyFactionGatheringBonuses(
+          unit.playerId, 
+          resourceType, 
+          gatherAmount
+        );
+        
+        // Limit amount to unit's carrying capacity
+        const maxCarry = resourceManager.getResourceCarryCapacity(unit.type);
+        gatherAmount = Math.min(gatherAmount, maxCarry);
+        
+        // Limit to actual resource amount available
+        gatherAmount = Math.min(gatherAmount, map[tileY][tileX].resource!.amount);
       }
       
       // Gathering animation - show worker harvesting with a small pause
