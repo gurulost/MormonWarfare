@@ -221,6 +221,93 @@ export class PathfindingManager {
     // No walkable tile found within range
     return null;
   }
+  
+  /**
+   * Find all tiles reachable within a certain movement range from a starting position
+   * @param startX Starting X position in grid coordinates
+   * @param startY Starting Y position in grid coordinates
+   * @param movementRange Maximum movement range in tiles
+   * @returns Array of reachable positions {x, y}
+   */
+  findReachableTiles(startX: number, startY: number, movementRange: number): { x: number; y: number }[] {
+    // Get the map from the scene
+    let map;
+    
+    // First try to use GameScene's getMap method if available
+    if (typeof (this.scene as any).getMap === 'function') {
+      map = (this.scene as any).getMap();
+    } else {
+      // Fallback to registry
+      map = this.scene.game.registry.get("map") || [];
+    }
+    
+    // Safety check
+    if (!map || !Array.isArray(map) || map.length === 0) {
+      console.error("Invalid map data in findReachableTiles");
+      return [];
+    }
+    
+    // Keep track of visited tiles to avoid duplicates
+    const visited = new Set<string>();
+    const reachableTiles: { x: number; y: number }[] = [];
+    
+    // Queue for breadth-first search (BFS)
+    const queue: { x: number; y: number; distance: number }[] = [
+      { x: startX, y: startY, distance: 0 }
+    ];
+    
+    // BFS to find all reachable tiles within the movement range
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      const key = `${current.x},${current.y}`;
+      
+      // Skip if we've already visited this tile
+      if (visited.has(key)) continue;
+      
+      // Mark as visited
+      visited.add(key);
+      
+      // Add to reachable tiles (except the starting position)
+      if (current.x !== startX || current.y !== startY) {
+        reachableTiles.push({ x: current.x, y: current.y });
+      }
+      
+      // Stop exploring from this tile if we've reached the movement limit
+      if (current.distance >= movementRange) continue;
+      
+      // Check all four adjacent tiles
+      const directions = [
+        { dx: 0, dy: -1 }, // North
+        { dx: 1, dy: 0 },  // East
+        { dx: 0, dy: 1 },  // South
+        { dx: -1, dy: 0 }  // West
+      ];
+      
+      for (const dir of directions) {
+        const nextX = current.x + dir.dx;
+        const nextY = current.y + dir.dy;
+        
+        // Check if the position is valid and walkable
+        if (
+          nextX >= 0 && nextX < map[0].length &&
+          nextY >= 0 && nextY < map.length &&
+          map[nextY] && map[nextY][nextX] && 
+          map[nextY][nextX].walkable
+        ) {
+          // Calculate movement cost to this tile
+          const movementCost = this.movementCost(current.x, current.y, nextX, nextY, map);
+          const newDistance = current.distance + movementCost;
+          
+          // Only add to queue if it's within movement range
+          if (newDistance <= movementRange) {
+            queue.push({ x: nextX, y: nextY, distance: newDistance });
+          }
+        }
+      }
+    }
+    
+    return reachableTiles;
+  }
 }
 
 // Node interface for A* pathfinding

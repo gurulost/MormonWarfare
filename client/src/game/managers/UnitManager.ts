@@ -11,6 +11,7 @@ export class UnitManager {
   private units: Map<string, Unit>;
   private pathfindingManager: PathfindingManager;
   private nextUnitId: number;
+  private movementTiles: Phaser.GameObjects.Rectangle[] = [];
   
   constructor(scene: Phaser.Scene, pathfindingManager: PathfindingManager) {
     this.scene = scene;
@@ -117,7 +118,91 @@ export class UnitManager {
     );
   }
   
+  /**
+   * Show or clear movement range indicators
+   */
+  private showMovementRange(unitId: string | null) {
+    // Clear any existing movement tiles
+    this.clearMovementRange();
+    
+    // If no unit selected, just return
+    if (!unitId) return;
+    
+    const unit = this.units.get(unitId);
+    if (!unit) return;
+    
+    // Get unit position in grid coordinates
+    const unitTileX = Math.floor(unit.x / TILE_SIZE);
+    const unitTileY = Math.floor(unit.y / TILE_SIZE);
+    
+    // Calculate movement range based on unit speed
+    const movementRange = unit.speed;
+    
+    // Get reachable tiles
+    const reachableTiles = this.pathfindingManager.findReachableTiles(unitTileX, unitTileY, movementRange);
+    
+    // Create visual indicators for each reachable tile
+    for (const tile of reachableTiles) {
+      const tileX = tile.x * TILE_SIZE + TILE_SIZE / 2;
+      const tileY = tile.y * TILE_SIZE + TILE_SIZE / 2;
+      
+      // Create a rectangle to highlight the tile
+      const rect = this.scene.add.rectangle(
+        tileX, 
+        tileY, 
+        TILE_SIZE, 
+        TILE_SIZE, 
+        0x3388ff, // Blue color
+        0.3 // Semi-transparent
+      );
+      
+      // Make the tile interactive and add click event
+      rect.setInteractive(
+        new Phaser.Geom.Rectangle(0, 0, TILE_SIZE, TILE_SIZE),
+        Phaser.Geom.Rectangle.Contains
+      );
+      
+      rect.on('pointerdown', () => {
+        // Move the selected unit to this tile
+        if (unitId) {
+          this.moveUnitsTo([unitId], tile.x, tile.y);
+          
+          // Clear the movement range after clicking
+          this.clearMovementRange();
+        }
+      });
+      
+      // Add hover effect
+      rect.on('pointerover', () => {
+        rect.setFillStyle(0x44aaff, 0.5); // Brighter blue on hover
+      });
+      
+      rect.on('pointerout', () => {
+        rect.setFillStyle(0x3388ff, 0.3); // Back to normal when not hovering
+      });
+      
+      // Store the tile for later removal
+      this.movementTiles.push(rect);
+    }
+  }
+  
+  /**
+   * Clear all movement range indicators
+   */
+  private clearMovementRange() {
+    // Destroy all movement tiles
+    for (const tile of this.movementTiles) {
+      tile.destroy();
+    }
+    
+    // Clear the array
+    this.movementTiles = [];
+  }
+  
   selectUnitsInBounds(bounds: Phaser.Geom.Rectangle, playerId: string): string[] {
+    // Clear any existing movement range indicators
+    this.clearMovementRange();
+    
     const selectedUnitIds: string[] = [];
     
     this.units.forEach((unit: Unit) => {
@@ -133,10 +218,18 @@ export class UnitManager {
       }
     });
     
+    // If exactly one unit is selected, show its movement range
+    if (selectedUnitIds.length === 1) {
+      this.showMovementRange(selectedUnitIds[0]);
+    }
+    
     return selectedUnitIds;
   }
   
   selectUnitAtPosition(x: number, y: number, playerId: string): string | null {
+    // Clear any existing movement indicators
+    this.clearMovementRange();
+    
     // Create a small rectangle around the click position
     const selectRadius = 15;
     const selectBounds = new Phaser.Geom.Rectangle(
@@ -170,6 +263,10 @@ export class UnitManager {
     if (closestUnit !== null) {
       const unitToSelect = closestUnit as Unit;
       unitToSelect.setSelected(true);
+      
+      // Show movement range for the selected unit
+      this.showMovementRange(unitToSelect.id);
+      
       return unitToSelect.id;
     }
     
