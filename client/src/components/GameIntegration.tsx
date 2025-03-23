@@ -25,7 +25,7 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
   const [playerFaction, setPlayerFaction] = useState<string>("Nephites");
   const [localPlayerId, setLocalPlayerId] = useState<string>("");
   const [cameraPosition, setCameraPosition] = useState({ x: 0, y: 0, width: 10, height: 10 });
-  const [overlayVisible, setOverlayVisible] = useState(false);
+  const [overlayVisible, setOverlayVisible] = useState(true); // Default to 3D view
   
   // Initialize and cleanup game data connection
   useEffect(() => {
@@ -312,12 +312,12 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
         onMinimapClick={handleMinimapClick}
       />
       
-      {/* Toggle button for 3D view */}
+      {/* Toggle button for switching between 3D/2D views */}
       <button
         className="fixed right-4 top-16 z-50 bg-black/70 text-white px-3 py-2 rounded-md text-sm shadow-lg backdrop-blur-md"
         onClick={() => setOverlayVisible(prev => !prev)}
       >
-        Toggle 3D View
+        {overlayVisible ? "Switch to 2D View" : "Switch to 3D View"}
       </button>
     </>
   );
