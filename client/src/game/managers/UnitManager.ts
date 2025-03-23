@@ -899,7 +899,15 @@ export class UnitManager {
    * Find a nearby resource of the same type
    */
   private findNearbyResource(centerX: number, centerY: number, resourceType: ResourceType, searchRadius: number = 8): { x: number, y: number } | null {
-    const map = this.scene.game.registry.get("map") || [];
+    let map;
+    
+    // First try to use GameScene's getMap method if available
+    if (typeof (this.scene as any).getMap === 'function') {
+      map = (this.scene as any).getMap();
+    } else {
+      // Fallback to registry
+      map = this.scene.game.registry.get("map") || [];
+    }
     
     // Check in increasing radius
     for (let radius = 2; radius <= searchRadius; radius++) {
