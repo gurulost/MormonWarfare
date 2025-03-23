@@ -290,7 +290,7 @@ export class UnitManager {
       actionId?: string; // Add actionId parameter for prediction tracking
     } = {}
   ) {
-    const { fromServer = false, isPrediction = false, isReapplied = false } = options;
+    const { fromServer = false, isPrediction = false, isReapplied = false, actionId } = options;
     
     // Log for debugging prediction systems
     if (isPrediction) {
