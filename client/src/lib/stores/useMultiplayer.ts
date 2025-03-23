@@ -2,6 +2,12 @@ import { create } from "zustand";
 import { FactionType, MultiplayerEvent } from "../../game/types";
 import { SOCKET_EVENTS } from "../../game/config";
 
+interface PendingAction {
+  type: string;
+  timestamp: number;
+  data: any;
+}
+
 interface MultiplayerState {
   connected: boolean;
   socket: WebSocket | null;
@@ -13,6 +19,13 @@ interface MultiplayerState {
     ready: boolean;
   }>;
   gameEventListeners: ((event: MultiplayerEvent) => void)[];
+  
+  // Improved server-client synchronization
+  lastServerTimestamp: number;
+  pendingActions: PendingAction[];
+  clientPrediction: boolean;
+  serverReconciliation: boolean;
+  networkLatency: number;
   
   // Socket connection
   connectToServer: () => void;
@@ -44,6 +57,13 @@ export const useMultiplayer = create<MultiplayerState>((set, get) => ({
   roomCode: null,
   players: [],
   gameEventListeners: [],
+  
+  // Improved synchronization properties
+  lastServerTimestamp: 0,
+  pendingActions: [],
+  clientPrediction: true, // Enable client-side prediction by default
+  serverReconciliation: true, // Enable server reconciliation by default
+  networkLatency: 0, // Track network latency for better prediction
   
   connectToServer: () => {
     console.log("Connecting to multiplayer server...");
@@ -236,31 +256,53 @@ export const useMultiplayer = create<MultiplayerState>((set, get) => ({
   },
   
   moveUnits: (unitIds: string[], targetX: number, targetY: number) => {
-    const { socket, roomCode } = get();
+    const state = get();
+    const { socket, roomCode, clientPrediction } = state;
     
     if (!socket || !roomCode) {
       console.error("Cannot move units: not in a game");
       return;
     }
     
-    // Send move command to server
-    socket.send(JSON.stringify({
+    // Create an action ID for tracking this command
+    const actionId = `move_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const timestamp = Date.now();
+    
+    // Create the move command
+    const moveCommand = {
       type: SOCKET_EVENTS.GAME_EVENT,
       roomCode,
       eventType: "unitMove",
       unitIds,
       targetX,
-      targetY
-    }));
+      targetY,
+      actionId, // Include the action ID for tracking
+      timestamp // Include the timestamp for reconciliation
+    };
     
-    // In a real implementation, the server would validate and broadcast this
-    // For demo, we'll simulate the command being processed
-    notifyGameEventListeners({
-      type: "unitMove",
-      unitIds,
-      targetX,
-      targetY
-    });
+    // Send move command to server
+    socket.send(JSON.stringify(moveCommand));
+    
+    // Add to pending actions for reconciliation
+    if (state.serverReconciliation) {
+      state.pendingActions.push({
+        type: "unitMove",
+        timestamp,
+        data: { unitIds, targetX, targetY, actionId }
+      });
+    }
+    
+    // Apply client-side prediction immediately if enabled
+    if (clientPrediction) {
+      console.log("Applying client-side prediction for unit movement");
+      notifyGameEventListeners({
+        type: "unitMove",
+        unitIds,
+        targetX,
+        targetY,
+        isPrediction: true
+      });
+    }
   },
   
   createUnit: (playerId: string, type: string, x: number, y: number) => {
@@ -474,6 +516,18 @@ function processStateUpdate(changes: any, timestamp: number) {
   // Apply delta changes to game state
   const state = useMultiplayer.getState();
   
+  // Store the server timestamp for reconciliation
+  state.lastServerTimestamp = timestamp;
+  
+  // Track which predictions were confirmed by server
+  if (state.pendingActions.length > 0) {
+    // Filter out actions that have been confirmed by the server
+    // This is a simplified approach - a real implementation would match action IDs
+    state.pendingActions = state.pendingActions.filter(action => 
+      action.timestamp > timestamp - 500 // Keep only very recent actions
+    );
+  }
+  
   // Notify listeners of state update
   notifyGameEventListeners({
     type: "stateUpdate",
@@ -482,17 +536,37 @@ function processStateUpdate(changes: any, timestamp: number) {
   });
 }
 
-// Respond to ping with pong
+// Respond to ping with pong and track network latency
 function respondToPing(timestamp: number) {
   const state = useMultiplayer.getState();
   const { socket, roomCode } = state;
   
   if (socket && roomCode) {
+    // Calculate current time before sending response
+    const currentTime = Date.now();
+    
+    // Calculate one-way latency approximation (half of the round trip)
+    const oneWayLatency = Math.floor((currentTime - timestamp) / 2);
+    
+    // Update latency in state (with some smoothing to avoid jitter)
+    const newLatency = state.networkLatency === 0 
+      ? oneWayLatency 
+      : Math.floor(state.networkLatency * 0.7 + oneWayLatency * 0.3);
+      
+    useMultiplayer.setState({ networkLatency: newLatency });
+    
+    // Send pong response with original timestamp for server to calculate round-trip time
     socket.send(JSON.stringify({
       type: "pong",
       roomCode,
-      timestamp
+      timestamp,
+      clientTime: currentTime // Include client time for more precise latency calculation
     }));
+    
+    // Log latency for debugging (can be removed in production)
+    if (oneWayLatency > 100) {
+      console.warn(`Network latency is high: ${oneWayLatency}ms`);
+    }
   }
 }
 
