@@ -106,7 +106,7 @@ export class EnhancedTechTreePanel {
       .on("pointerdown", () => this.toggle());
     
     // Category tabs at the top
-    const categories = ["military", "economy", "defense", "special"];
+    const categories: CategoryType[] = ["military", "economy", "defense", "special"];
     const categoryWidth = this.PANEL_WIDTH / categories.length;
     
     categories.forEach((category, index) => {
@@ -135,7 +135,7 @@ export class EnhancedTechTreePanel {
       
       // Tab interactions
       tab.on("pointerdown", () => {
-        this.selectedCategory = category;
+        this.selectedCategory = category as CategoryType;
         this.updateCategorySelection();
         this.populateTechTree();
       });
@@ -171,14 +171,20 @@ export class EnhancedTechTreePanel {
       .on("pointerdown", () => this.scroll(50));
     
     // Add elements to panel
-    this.panel.add([
+    const elements = [
       panelBg,
       titleText,
       closeButton,
       scrollUpButton,
-      scrollDownButton,
-      ...this.categoryButtons.values()
-    ]);
+      scrollDownButton
+    ];
+    
+    // Add category buttons from map
+    for (const button of Array.from(this.categoryButtons.values())) {
+      elements.push(button);
+    }
+    
+    this.panel.add(elements);
     
     // Add category description container
     const descriptionContainer = this.scene.add.container(0, -this.PANEL_HEIGHT/2 + 120);
@@ -216,7 +222,8 @@ export class EnhancedTechTreePanel {
   private updateCategorySelection() {
     this.categoryButtons.forEach((button, category) => {
       const isSelected = category === this.selectedCategory;
-      const color = this.CATEGORY_COLORS[category];
+      const categoryType = category as CategoryType;
+      const color = this.CATEGORY_COLORS[categoryType];
       
       button.setStyle({
         fontSize: isSelected ? "20px" : "18px",
@@ -548,24 +555,27 @@ export class EnhancedTechTreePanel {
     }
     
     // If tech unlocks units or buildings, show icon
-    if (tech.unlocks && (tech.unlocks.units?.length > 0 || tech.unlocks.buildings?.length > 0)) {
-      const unlockItems = [];
-      if (tech.unlocks.units) unlockItems.push(...tech.unlocks.units);
-      if (tech.unlocks.buildings) unlockItems.push(...tech.unlocks.buildings);
+    if (tech.unlocks) {
+      // Safely check if arrays exist and have items
+      const units = tech.unlocks.units || [];
+      const buildings = tech.unlocks.buildings || [];
+      const hasUnlocks = units.length > 0 || buildings.length > 0;
       
-      const unlockText = this.scene.add.text(
-        this.NODE_WIDTH/2 - 10, -this.NODE_HEIGHT/2 + 10,
-        "UNLOCKS",
-        {
-          fontFamily: "monospace",
-          fontSize: "10px",
-          color: "#33ffff",
-          backgroundColor: "#225555",
-          padding: { x: 5, y: 2 }
-        }
-      ).setOrigin(1, 0);
-      
-      container.add(unlockText);
+      if (hasUnlocks) {
+        const unlockText = this.scene.add.text(
+          this.NODE_WIDTH/2 - 10, -this.NODE_HEIGHT/2 + 10,
+          "UNLOCKS",
+          {
+            fontFamily: "monospace",
+            fontSize: "10px",
+            color: "#33ffff",
+            backgroundColor: "#225555",
+            padding: { x: 5, y: 2 }
+          }
+        ).setOrigin(1, 0);
+        
+        container.add(unlockText);
+      }
     }
     
     return container;

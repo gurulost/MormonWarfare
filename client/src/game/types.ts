@@ -1,7 +1,7 @@
 // Game types and interfaces
 
 export type FactionType = "Nephites" | "Lamanites";
-export type UnitType = "worker" | "melee" | "ranged" | "hero";
+export type UnitType = "worker" | "melee" | "ranged" | "cavalry" | "hero";
 export type BuildingType = "cityCenter" | "barracks" | "archeryRange" | "wall";
 export type ResourceType = "food" | "ore";
 export type GamePhase = "menu" | "lobby" | "playing" | "gameOver";
