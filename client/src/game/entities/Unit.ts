@@ -24,10 +24,12 @@ export class Unit {
   isMoving: boolean;
   isGathering: boolean;
   isAttacking: boolean;
+  isGatheringAnimationPlaying: boolean;
   targetResourceX: number | null;
   targetResourceY: number | null;
   targetUnitId: string | null;
   carryingResource: { type: 'food' | 'ore', amount: number } | null;
+  gatheringEfficiency: number; // Faction-specific bonus
   
   constructor(
     scene: Phaser.Scene,
@@ -51,10 +53,16 @@ export class Unit {
     this.isMoving = false;
     this.isGathering = false;
     this.isAttacking = false;
+    this.isGatheringAnimationPlaying = false;
     this.targetResourceX = null;
     this.targetResourceY = null;
     this.targetUnitId = null;
     this.carryingResource = null;
+    
+    // Set gathering efficiency based on faction
+    this.gatheringEfficiency = this.faction === "Nephites" ? 
+      (type === "worker" ? 1.2 : 1.0) : // Nephites are better at farming
+      (type === "worker" ? 1.0 : 0.8);  // Lamanites are better at mining
     
     // Set unit stats based on type and faction
     const stats = this.getUnitStats();
@@ -502,5 +510,49 @@ export class Unit {
   
   stopCarryingResource() {
     this.carryingResource = null;
+  }
+  
+  /**
+   * Play a gathering animation for the worker
+   */
+  playGatheringAnimation() {
+    if (this.isGatheringAnimationPlaying) return;
+    
+    // Mark animation as playing to prevent duplicate animations
+    this.isGatheringAnimationPlaying = true;
+    
+    // Get the unit's scene
+    const scene = this.sprite.scene;
+    
+    // Create a tween to show the gathering motion (slight bouncing)
+    scene.tweens.add({
+      targets: this.sprite,
+      y: this.y - 5,
+      duration: 300,
+      yoyo: true,
+      repeat: 1,
+      ease: 'Sine.easeInOut',
+      onComplete: () => {
+        // Reset flag when animation completes
+        this.isGatheringAnimationPlaying = false;
+        
+        // Reset position
+        this.sprite.y = this.y;
+      }
+    });
+    
+    // Rotate the unit slightly left and right to show gathering motion
+    scene.tweens.add({
+      targets: this.sprite,
+      angle: { from: -10, to: 10 },
+      duration: 300,
+      yoyo: true,
+      repeat: 1,
+      ease: 'Sine.easeInOut',
+      onComplete: () => {
+        // Reset rotation
+        this.sprite.angle = 0;
+      }
+    });
   }
 }

@@ -366,33 +366,144 @@ export class GameScene extends Phaser.Scene {
     }
   }
   
-  private addResource(x: number, y: number, type: ResourceType) {
-    // Update map data
-    this.map[y][x].resource = {
-      type,
-      amount: type === 'food' ? 300 : 500 // Ore has more resources
-    };
+  private addResource(x: number, y: number, type: ResourceType, amount?: number) {
+    // Update map data if amount not provided
+    if (!this.map[y][x].resource || amount !== undefined) {
+      this.map[y][x].resource = {
+        type,
+        amount: amount || (type === 'food' ? 300 : 500) // Ore has more resources by default
+      };
+    }
     
-    // Create resource visual
-    const resourceColor = type === 'food' ? 0x22aa22 : 0x884422;
-    const resourceMarker = this.add.circle(
+    // Get existing amount if already has resource
+    const resourceAmount = this.map[y][x].resource!.amount;
+    
+    // Create resource container for the visuals
+    const resourceContainer = this.add.container(
       x * TILE_SIZE + TILE_SIZE / 2,
-      y * TILE_SIZE + TILE_SIZE / 2,
-      TILE_SIZE / 4,
-      resourceColor
+      y * TILE_SIZE + TILE_SIZE / 2
     );
     
-    // Add text indicator
-    this.add.text(
-      x * TILE_SIZE + TILE_SIZE / 2,
-      y * TILE_SIZE + TILE_SIZE / 2,
+    // Store reference to the container in the game registry for updates
+    if (!this.registry.has('resourceMarkers')) {
+      this.registry.set('resourceMarkers', {});
+    }
+    const resourceMarkers = this.registry.get('resourceMarkers');
+    resourceMarkers[`${x},${y}`] = resourceContainer;
+    
+    // Create resource icon based on type
+    if (type === 'food') {
+      // Food resource (crops/fruit)
+      const baseColor = 0x22aa22; // Darker green
+      const highlightColor = 0x44cc44; // Lighter green
+      
+      // Base circle for food
+      const baseCircle = this.add.circle(0, 0, TILE_SIZE / 4, baseColor);
+      
+      // Create stylized food icon (small stalks for crops)
+      const stalk1 = this.add.rectangle(-3, -8, 2, 10, highlightColor).setRotation(-0.2);
+      const stalk2 = this.add.rectangle(3, -8, 2, 10, highlightColor).setRotation(0.2);
+      const stalk3 = this.add.rectangle(0, -10, 2, 12, highlightColor);
+      
+      resourceContainer.add([baseCircle, stalk1, stalk2, stalk3]);
+    } else {
+      // Ore resource (minerals)
+      const baseColor = 0x884422; // Brown base
+      const highlightColor = 0xaa6644; // Lighter brown/copper
+      
+      // Base circle for ore
+      const baseCircle = this.add.circle(0, 0, TILE_SIZE / 4, baseColor);
+      
+      // Create stylized ore icon (small rock chunks)
+      const rock1 = this.add.circle(-4, -4, 3, highlightColor);
+      const rock2 = this.add.circle(4, -2, 4, highlightColor);
+      const rock3 = this.add.circle(0, 3, 3, highlightColor);
+      
+      resourceContainer.add([baseCircle, rock1, rock2, rock3]);
+    }
+    
+    // Add text indicator showing resource type
+    const resourceText = this.add.text(
+      0, 0,
       type === 'food' ? "F" : "O",
       {
         fontFamily: "monospace",
         fontSize: "12px",
-        color: "#ffffff"
+        color: "#ffffff",
+        stroke: "#000000",
+        strokeThickness: 1
       }
     ).setOrigin(0.5);
+    
+    resourceContainer.add(resourceText);
+    
+    // Add resource amount indicator (size proportional to amount)
+    const maxAmount = type === 'food' ? 300 : 500;
+    const sizeRatio = Math.min(1, resourceAmount / maxAmount);
+    
+    // Outer ring indicating resource amount
+    const resourceRing = this.add.circle(
+      0, 0,
+      TILE_SIZE / 3,
+      type === 'food' ? 0x44ff44 : 0xcc8844,
+      0.2
+    ).setStrokeStyle(2, type === 'food' ? 0x44ff44 : 0xcc8844, sizeRatio);
+    
+    resourceContainer.add(resourceRing);
+    
+    // Add resource to registry for later reference
+    this.registry.set(`resource_${x}_${y}`, {
+      container: resourceContainer,
+      ring: resourceRing,
+      type: type,
+      tileX: x,
+      tileY: y
+    });
+    
+    return resourceContainer;
+  }
+  
+  /**
+   * Updates the visual appearance of a resource based on its current amount
+   */
+  private updateResourceVisual(x: number, y: number) {
+    const resource = this.map[y][x].resource;
+    if (!resource) return;
+    
+    const resourceKey = `resource_${x}_${y}`;
+    const resourceData = this.registry.get(resourceKey);
+    
+    if (!resourceData) return;
+    
+    const maxAmount = resource.type === 'food' ? 300 : 500;
+    const sizeRatio = Math.min(1, resource.amount / maxAmount);
+    
+    // Update outer ring to show remaining resources
+    resourceData.ring.setAlpha(0.2 * sizeRatio + 0.1);
+    resourceData.ring.setStrokeStyle(2, 
+      resource.type === 'food' ? 0x44ff44 : 0xcc8844, 
+      sizeRatio
+    );
+    
+    // If nearly depleted, make the resource icon pulse to indicate it's almost gone
+    if (sizeRatio < 0.2) {
+      const pulseRate = 500; // ms
+      
+      if (!resourceData.pulseTween) {
+        resourceData.pulseTween = this.tweens.add({
+          targets: resourceData.container,
+          scaleX: { from: 0.8, to: 1 },
+          scaleY: { from: 0.8, to: 1 },
+          alpha: { from: 0.7, to: 1 },
+          duration: pulseRate,
+          yoyo: true,
+          repeat: -1
+        });
+      }
+    } else if (resourceData.pulseTween && resourceData.pulseTween.isPlaying()) {
+      resourceData.pulseTween.stop();
+      resourceData.container.setScale(1).setAlpha(1);
+    }
   }
   
   private updateCameraPosition(delta: number) {

@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { Unit } from "../entities/Unit";
-import { UnitType, FactionType } from "../types";
+import { UnitType, FactionType, ResourceType } from "../types";
 import { PathfindingManager } from "./PathfindingManager";
 import { TILE_SIZE, MAP_SIZE } from "../config";
 import { useMultiplayer } from "../../lib/stores/useMultiplayer";
@@ -543,17 +543,52 @@ export class UnitManager {
     // If not carrying a resource, gather it
     if (!unit.carryingResource) {
       const resourceType = map[tileY][tileX].resource!.type;
-      const gatherAmount = resourceType === 'food' ? 10 : 5; // Gather less ore per trip
+      
+      // Update gathering rate based on faction bonuses
+      let gatherAmount = resourceType === 'food' ? 10 : 5; // Base gather rates
+      
+      // Apply faction bonuses
+      if (unit.faction === "Nephites" && resourceType === "food") {
+        // Nephites are better at farming
+        gatherAmount += 2;
+      } else if (unit.faction === "Lamanites" && resourceType === "ore") {
+        // Lamanites are better at mining
+        gatherAmount += 2;
+      }
+      
+      // Gathering animation - show worker harvesting with a small pause
+      unit.playGatheringAnimation();
+      
+      // Create gathering particle effect
+      this.createGatheringEffect(unit.x, unit.y, resourceType);
       
       // Reduce resource amount from the tile
       map[tileY][tileX].resource!.amount -= gatherAmount;
+      
+      // Update resource visual
+      if (this.scene.updateResourceVisual) {
+        this.scene.updateResourceVisual(tileX, tileY);
+      }
+      
+      // Play gathering sound
+      this.playGatheringSound(resourceType);
       
       // Start carrying the resource
       unit.startCarryingResource(resourceType, gatherAmount);
       
       // Check if resource is depleted
       if (map[tileY][tileX].resource!.amount <= 0) {
+        // Resource is depleted - remove it and show depletion effect
+        this.createResourceDepletionEffect(tileX * TILE_SIZE + TILE_SIZE / 2, tileY * TILE_SIZE + TILE_SIZE / 2, resourceType);
         map[tileY][tileX].resource = null;
+        
+        // Remove the resource visual
+        const resourceMarkers = this.scene.registry.get('resourceMarkers');
+        if (resourceMarkers && resourceMarkers[`${tileX},${tileY}`]) {
+          resourceMarkers[`${tileX},${tileY}`].destroy();
+          delete resourceMarkers[`${tileX},${tileY}`];
+        }
+        
         unit.stopGathering();
       }
       
@@ -584,6 +619,9 @@ export class UnitManager {
         
         // Check if we're at the city center
         if (unitTileX === cityCenterX && unitTileY === cityCenterY) {
+          // Deposit animation and effect
+          this.createDepositEffect(unit.x, unit.y, unit.carryingResource.type);
+          
           // Deposit resource
           const resourceManager = this.scene.game.registry.get("resourceManager");
           if (resourceManager) {
@@ -592,6 +630,9 @@ export class UnitManager {
               unit.carryingResource.type,
               unit.carryingResource.amount
             );
+            
+            // Play deposit sound
+            this.playDepositSound(unit.carryingResource.type);
           }
           
           // Stop carrying
@@ -606,6 +647,13 @@ export class UnitManager {
           } else {
             // Resource depleted, stop gathering
             unit.stopGathering();
+            
+            // Look for similar nearby resources to continue gathering
+            const newResourceTile = this.findNearbyResource(unitTileX, unitTileY, unit.carryingResource.type);
+            if (newResourceTile) {
+              // Set unit to gather from the new resource
+              this.orderUnitsToGatherResource([unit.id], newResourceTile.x, newResourceTile.y);
+            }
           }
         } else {
           // Not at city center yet, move there
@@ -620,6 +668,199 @@ export class UnitManager {
         unit.stopCarryingResource();
       }
     }
+  }
+  
+  /**
+   * Create particle effect for resource gathering
+   */
+  private createGatheringEffect(x: number, y: number, resourceType: ResourceType) {
+    // Create particles based on resource type
+    const particleColor = resourceType === 'food' ? 0x44ff44 : 0xcc8844;
+    
+    // Create particle emitter
+    const particles = this.scene.add.particles(0, 0, 'particle', {
+      x: x,
+      y: y,
+      speed: { min: 20, max: 50 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 0.6, end: 0 },
+      lifespan: 600,
+      quantity: 5,
+      tint: particleColor
+    });
+    
+    // Auto-destroy after animation completes
+    this.scene.time.delayedCall(1000, () => {
+      particles.destroy();
+    });
+  }
+  
+  /**
+   * Create effect for resource depletion
+   */
+  private createResourceDepletionEffect(x: number, y: number, resourceType: ResourceType) {
+    // Create a more dramatic particle effect for resource depletion
+    const particleColor = resourceType === 'food' ? 0x44ff44 : 0xcc8844;
+    
+    // Create particle emitter
+    const particles = this.scene.add.particles(0, 0, 'particle', {
+      x: x,
+      y: y,
+      speed: { min: 50, max: 100 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 1, end: 0 },
+      lifespan: 1500,
+      quantity: 20,
+      tint: particleColor
+    });
+    
+    // Add explosion effect
+    const explosion = this.scene.add.circle(x, y, 25, particleColor, 0.7);
+    this.scene.tweens.add({
+      targets: explosion,
+      alpha: 0,
+      scale: 2,
+      duration: 1000,
+      onComplete: () => {
+        explosion.destroy();
+      }
+    });
+    
+    // Display depletion text
+    const depletionText = this.scene.add.text(x, y, "Depleted!", {
+      fontFamily: 'monospace',
+      fontSize: '14px',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 3
+    }).setOrigin(0.5);
+    
+    this.scene.tweens.add({
+      targets: depletionText,
+      y: y - 40,
+      alpha: 0,
+      duration: 2000,
+      onComplete: () => {
+        depletionText.destroy();
+      }
+    });
+    
+    // Auto-destroy particles after animation completes
+    this.scene.time.delayedCall(1500, () => {
+      particles.destroy();
+    });
+  }
+  
+  /**
+   * Create effect for resource deposit at city center
+   */
+  private createDepositEffect(x: number, y: number, resourceType: ResourceType) {
+    // Create particles based on resource type
+    const particleColor = resourceType === 'food' ? 0x44ff44 : 0xcc8844;
+    
+    // Create deposit particles that rise up
+    const particles = this.scene.add.particles(0, 0, 'particle', {
+      x: x,
+      y: y,
+      speed: { min: 20, max: 50 },
+      angle: { min: 250, max: 290 },
+      scale: { start: 0.5, end: 0 },
+      lifespan: 800,
+      quantity: 10,
+      tint: particleColor
+    });
+    
+    // Create visual effect showing resource amount
+    const depositText = this.scene.add.text(
+      x, y - 20,
+      `+${resourceType === 'food' ? '🌽' : '⛏️'}`,
+      {
+        fontFamily: 'monospace',
+        fontSize: '16px',
+        color: resourceType === 'food' ? '#44ff44' : '#cc8844',
+        stroke: '#000000',
+        strokeThickness: 3
+      }
+    ).setOrigin(0.5);
+    
+    // Animate the resource text rising
+    this.scene.tweens.add({
+      targets: depositText,
+      y: y - 50,
+      alpha: 0,
+      duration: 1500,
+      onComplete: () => depositText.destroy()
+    });
+    
+    // Auto-destroy particles after animation completes
+    this.scene.time.delayedCall(1000, () => {
+      particles.destroy();
+    });
+  }
+  
+  /**
+   * Play gathering sound based on resource type
+   */
+  private playGatheringSound(resourceType: ResourceType) {
+    const audioStore = useAudio.getState();
+    if (audioStore.isMuted) return;
+    
+    // Sound effect not loaded in audio store yet, using simple audio for now
+    const sound = this.scene.sound.add(
+      resourceType === 'food' ? 'gatherFood' : 'gatherOre', 
+      { volume: 0.3 }
+    );
+    sound.play();
+  }
+  
+  /**
+   * Play deposit sound based on resource type
+   */
+  private playDepositSound(resourceType: ResourceType) {
+    const audioStore = useAudio.getState();
+    if (audioStore.isMuted) return;
+    
+    // Use success sound from audio store
+    if (audioStore.successSound) {
+      audioStore.playSuccess();
+    } else {
+      // Fallback if success sound not loaded
+      const sound = this.scene.sound.add('deposit', { volume: 0.4 });
+      sound.play();
+    }
+  }
+  
+  /**
+   * Find a nearby resource of the same type
+   */
+  private findNearbyResource(centerX: number, centerY: number, resourceType: ResourceType, searchRadius: number = 8): { x: number, y: number } | null {
+    const map = this.scene.game.registry.get("map") || [];
+    
+    // Check in increasing radius
+    for (let radius = 2; radius <= searchRadius; radius++) {
+      // Check positions in a square around the center
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          // Skip if not on the perimeter of the square (for efficiency)
+          if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) {
+            continue;
+          }
+          
+          const testX = centerX + dx;
+          const testY = centerY + dy;
+          
+          // Check if valid position
+          if (testX >= 0 && testX < MAP_SIZE && testY >= 0 && testY < MAP_SIZE) {
+            // Check if this tile has a resource of the desired type
+            if (map[testY][testX].resource && map[testY][testX].resource.type === resourceType) {
+              return { x: testX, y: testY };
+            }
+          }
+        }
+      }
+    }
+    
+    return null;
   }
   
   private findNearestBuilding(x: number, y: number, playerId: string, type: string) {
