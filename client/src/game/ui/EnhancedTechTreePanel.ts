@@ -27,8 +27,8 @@ export class EnhancedTechTreePanel {
   private readonly NODE_HEIGHT: number = 120;
   private readonly NODE_SPACING_X: number = 250;
   private readonly NODE_SPACING_Y: number = 150;
-  private readonly TECH_TIERS: { [key: string]: number } = {};
-  private readonly CATEGORY_COLORS = {
+  private techTiers: { [key: string]: number } = {}; // Changed from readonly to mutable
+  private readonly CATEGORY_COLORS: { [key: string]: number } = {
     military: 0xb92d2d,   // Red for military
     economy: 0x2d8a36,    // Green for economy
     defense: 0x3d6fa3,    // Blue for defense

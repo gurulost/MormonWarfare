@@ -7,6 +7,7 @@ import { PathfindingManager } from "../managers/PathfindingManager";
 import { CombatManager } from "../managers/CombatManager";
 import { TechManager } from "../managers/TechManager";
 import { GameUI } from "../ui/GameUI";
+import { EnhancedTechTreePanel } from "../ui/EnhancedTechTreePanel";
 import { useMultiplayer } from "../../lib/stores/useMultiplayer";
 import { useAudio } from "../../lib/stores/useAudio";
 import { TILE_SIZE, MAP_SIZE, CAMERA_SPEED } from "../config";
@@ -30,6 +31,7 @@ export class GameScene extends Phaser.Scene {
   private combatManager!: CombatManager;
   private techManager!: TechManager;
   private gameUI!: GameUI;
+  private enhancedTechTree!: EnhancedTechTreePanel;
   
   // Selection
   private selectedUnits: string[] = [];
@@ -105,6 +107,14 @@ export class GameScene extends Phaser.Scene {
     
     // Initialize UI
     this.gameUI = new GameUI(this, this.resourceManager, this.unitManager, this.buildingManager, this.techManager);
+    
+    // Initialize enhanced tech tree UI
+    this.enhancedTechTree = new EnhancedTechTreePanel(this, this.techManager, this.resourceManager);
+    
+    // Add keyboard shortcut to toggle tech tree (T key)
+    this.input.keyboard?.on('keydown-T', () => {
+      this.enhancedTechTree.toggle();
+    });
     
     // Initialize starting units and buildings for each player
     this.initializePlayersStartingEntities();
