@@ -1,6 +1,12 @@
 import Phaser from "phaser";
 import { UnitManager } from "./UnitManager";
-import { TILE_SIZE, COMBAT_UPDATE_RATE } from "../config";
+import { 
+  TILE_SIZE, 
+  COMBAT_UPDATE_RATE, 
+  COUNTER_DAMAGE_MULTIPLIER,
+  WEAKNESS_DAMAGE_MULTIPLIER,
+  UNIT_STATS
+} from "../config";
 import { useAudio } from "../../lib/stores/useAudio";
 
 export class CombatManager {
@@ -99,17 +105,101 @@ export class CombatManager {
     }
   }
   
-  private calculateDamage(attack: number, defense: number): number {
+  private calculateDamage(attack: number, defense: number, attacker?: any, defender?: any): number {
     // Base damage is attack value
     let damage = attack;
+    let damageMultiplier = 1.0;
+    
+    // Apply counter system bonuses if both units are combat units
+    if (attacker && defender) {
+      // Get unit types
+      const attackerType = attacker.type;
+      const defenderType = defender.type;
+      
+      // Check for counter bonus
+      if (this.isCounterUnit(attackerType, defenderType)) {
+        // This unit type counters the defending unit type
+        damageMultiplier *= COUNTER_DAMAGE_MULTIPLIER;
+        
+        // Create a visual effect to show counter bonus
+        this.createCounterEffectVisual(defender.x, defender.y, true);
+        
+        console.log(`Counter bonus! ${attackerType} is strong against ${defenderType}`);
+      }
+      
+      // Check for weakness penalty
+      if (this.isWeakToUnit(attackerType, defenderType)) {
+        // Defending unit has advantage against attacking unit
+        defense *= WEAKNESS_DAMAGE_MULTIPLIER;
+        
+        // Create a visual effect to show weakness
+        this.createCounterEffectVisual(attacker.x, attacker.y, false);
+        
+        console.log(`Weakness penalty! ${attackerType} is weak against ${defenderType}`);
+      }
+    }
+    
+    // Apply the damage multiplier
+    damage = damage * damageMultiplier;
     
     // Reduce by defense (but ensure minimum damage of 1)
     damage = Math.max(1, damage - defense / 2);
     
-    // Add some randomness
-    damage = Math.floor(damage * (0.8 + Math.random() * 0.4));
+    // Add some randomness (reduced from 40% to 30% variance for more consistent outcomes)
+    damage = Math.floor(damage * (0.85 + Math.random() * 0.3));
     
     return damage;
+  }
+  
+  /**
+   * Determines if unitType has a counter advantage against targetType
+   */
+  private isCounterUnit(unitType: string, targetType: string): boolean {
+    // Get unit stats
+    const stats = UNIT_STATS[unitType as keyof typeof UNIT_STATS];
+    
+    // Check if this unit type has counters and if targetType is in the list
+    return !!(stats && stats.counters && stats.counters.includes(targetType));
+  }
+  
+  /**
+   * Determines if unitType is weak against targetType
+   */
+  private isWeakToUnit(unitType: string, targetType: string): boolean {
+    // Get unit stats
+    const stats = UNIT_STATS[unitType as keyof typeof UNIT_STATS];
+    
+    // Check if this unit type has weaknesses and if targetType is in the list
+    return !!(stats && stats.weakTo && stats.weakTo.includes(targetType));
+  }
+  
+  /**
+   * Creates a visual effect to show counter advantage or weakness
+   */
+  private createCounterEffectVisual(x: number, y: number, isCounterBonus: boolean): void {
+    // Create a text effect to show counter or weakness
+    const text = this.scene.add.text(
+      x, 
+      y - 20, 
+      isCounterBonus ? "COUNTER!" : "WEAK!", 
+      { 
+        fontSize: "16px", 
+        color: isCounterBonus ? "#00ff00" : "#ff0000",
+        stroke: "#000000",
+        strokeThickness: 3
+      }
+    );
+    
+    // Animate the text
+    this.scene.tweens.add({
+      targets: text,
+      y: y - 50,
+      alpha: 0,
+      duration: 1000,
+      onComplete: () => {
+        text.destroy();
+      }
+    });
   }
   
   private autoEngageEnemies() {
