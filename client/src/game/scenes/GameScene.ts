@@ -953,7 +953,9 @@ export class GameScene extends Phaser.Scene {
   // Method to select a unit by ID - added for 3D view interaction
   selectUnitById(unitId: string): void {
     // Clear current selection if not shift key held
-    if (!this.input.keyboard.isDown(Phaser.Input.Keyboard.KeyCodes.SHIFT)) {
+    const shiftKey = Phaser.Input.Keyboard.KeyCodes.SHIFT;
+    const keyboardPlugin = this.input.keyboard;
+    if (keyboardPlugin && !keyboardPlugin.checkDown(shiftKey)) {
       this.selectedUnits = [];
     }
     
@@ -1060,7 +1062,7 @@ export class GameScene extends Phaser.Scene {
           type as any, // Type assertion because TypeScript doesn't know our specific types
           x,
           y,
-          playerData.faction
+          playerData.faction as any // Type assertion to handle potential type mismatch
         );
         
         if (building) {

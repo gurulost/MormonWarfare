@@ -71,10 +71,11 @@ export function ModelLoader({
 }
 
 // Helper function for model mapping
-export const getModelPathByType = (
+// Note: Using function declaration instead of arrow function for consistent HMR
+export function getModelPathByType(
   type: string, 
   faction: "Nephites" | "Lamanites" | null = null
-): string => {
+): string {
   // Unit models
   if (type === "melee") {
     return faction === "Nephites" 
@@ -92,6 +93,12 @@ export const getModelPathByType = (
     return "/models/worker.glb";
   }
   
+  if (type === "hero") {
+    return faction === "Nephites" 
+      ? "/models/nephite_hero.glb" 
+      : "/models/lamanite_hero.glb";
+  }
+  
   // Building models
   if (type === "cityCenter") {
     return faction === "Nephites" 
@@ -99,6 +106,19 @@ export const getModelPathByType = (
       : "/models/lamanite_city_center.glb";
   }
   
+  if (type === "barracks") {
+    return faction === "Nephites" 
+      ? "/models/nephite_barracks.glb" 
+      : "/models/lamanite_barracks.glb";
+  }
+  
+  if (type === "archeryRange") {
+    return faction === "Nephites" 
+      ? "/models/nephite_archery_range.glb" 
+      : "/models/lamanite_archery_range.glb";
+  }
+  
   // Fallback to a default model
+  console.warn(`No model found for type: ${type}, faction: ${faction}. Using default model.`);
   return "/models/worker.glb";
 };
