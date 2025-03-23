@@ -35,6 +35,21 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
     const gameScene = gameInstance.scene.getScene("GameScene") as any;
     if (!gameScene) return;
     
+    // Ensure 3D view is correctly set with camera angle
+    let cameraTimer: NodeJS.Timeout | null = null;
+    if (overlayVisible) {
+      cameraTimer = setTimeout(() => {
+        if ((window as any).cameraControls) {
+          try {
+            (window as any).cameraControls.setStrategicView();
+            console.log("Strategic view applied from GameIntegration");
+          } catch (error) {
+            console.error("Could not set strategic view:", error);
+          }
+        }
+      }, 1000);
+    }
+    
     // Set up data access from Phaser game
     const updateGameData = () => {
       if (!gameScene) return;
@@ -126,6 +141,7 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
     // Clean up
     return () => {
       clearInterval(dataInterval);
+      if (cameraTimer) clearTimeout(cameraTimer);
     };
   }, [gameInstance]);
   

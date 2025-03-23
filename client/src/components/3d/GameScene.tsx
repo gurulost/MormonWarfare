@@ -517,6 +517,19 @@ export const GameScene = ({
   // UI Controls for camera
   const [showCameraControls, setShowCameraControls] = useState(false);
   
+  // Auto-set strategic view when component loads
+  useEffect(() => {
+    // Give a small delay to ensure the component is fully mounted
+    const timer = setTimeout(() => {
+      if ((window as any).cameraControls) {
+        (window as any).cameraControls.setStrategicView();
+        console.log("Initial strategic view set");
+      }
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, []);
+  
   // Toggle camera control panel
   const toggleCameraControls = () => {
     setShowCameraControls(prev => !prev);
