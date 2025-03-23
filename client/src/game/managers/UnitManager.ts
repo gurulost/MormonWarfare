@@ -566,8 +566,10 @@ export class UnitManager {
       map[tileY][tileX].resource!.amount -= gatherAmount;
       
       // Update resource visual
-      if (this.scene.updateResourceVisual) {
-        this.scene.updateResourceVisual(tileX, tileY);
+      // Access the GameScene instance to call updateResourceVisual
+      if (this.scene.scene.key === 'GameScene') {
+        // The method exists on the GameScene instance
+        (this.scene as any).updateResourceVisual(tileX, tileY);
       }
       
       // Play gathering sound

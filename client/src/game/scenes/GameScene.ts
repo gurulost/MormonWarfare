@@ -61,6 +61,9 @@ export class GameScene extends Phaser.Scene {
     // Initialize cursor keys
     this.cursorKeys = this.input.keyboard!.createCursorKeys();
     
+    // Create particle textures for resource effects
+    this.createParticleTextures();
+    
     // Initialize the managers
     this.pathfindingManager = new PathfindingManager(this);
     this.resourceManager = new ResourceManager(this);
@@ -461,6 +464,26 @@ export class GameScene extends Phaser.Scene {
     });
     
     return resourceContainer;
+  }
+  
+  /**
+   * Create particle textures for resource gathering effects
+   */
+  private createParticleTextures() {
+    // Create a basic particle texture if not already loaded
+    if (!this.textures.exists('particle')) {
+      // Create a white circle as a particle texture
+      const graphics = this.add.graphics();
+      graphics.fillStyle(0xffffff);
+      graphics.fillCircle(8, 8, 8);
+      graphics.generateTexture('particle', 16, 16);
+      graphics.destroy();
+      
+      // Create gathering sound effects if they don't exist yet
+      this.sound.add('gatherFood', { volume: 0.3 });
+      this.sound.add('gatherOre', { volume: 0.3 });
+      this.sound.add('deposit', { volume: 0.4 });
+    }
   }
   
   /**
