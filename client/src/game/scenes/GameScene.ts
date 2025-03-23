@@ -146,7 +146,8 @@ export class GameScene extends Phaser.Scene {
     this.unitManager.update(delta);
     this.buildingManager.update(delta);
     this.combatManager.update(delta);
-    this.tutorialManager.update(delta);
+    
+    // Tutorial manager updates itself via its own timers and event listeners
     
     // Update minimap
     this.updateMinimap();

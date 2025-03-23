@@ -562,14 +562,6 @@ export class TutorialManager {
     localStorage.removeItem('tutorialStarted');
   }
 
-  /**
-   * Update the tutorial manager
-   * @param delta Time since last update
-   */
-  update(delta: number): void {
-    // Use this to implement any continuous updates needed for the tutorial
-    // Such as checking for completion conditions
-    
-    // Currently no continuous updates needed as we use events and timers
-  }
+  // The tutorial manager uses internal timers and events
+  // so it doesn't need an explicit update method called each frame
 }

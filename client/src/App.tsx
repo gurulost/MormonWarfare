@@ -7,6 +7,7 @@ import { GameScene } from "./game/scenes/GameScene";
 import "@fontsource/inter";
 import { useMultiplayer } from "./lib/stores/useMultiplayer";
 import GameContainer from "./components/GameContainer";
+import TutorialController from "./components/TutorialController";
 
 // Main App component
 function App() {
@@ -69,6 +70,9 @@ function App() {
       
       {/* Our React Game Container with UI overlays and 3D rendering */}
       {game && <GameContainer gameInstance={game} />}
+      
+      {/* Tutorial controller to provide onboarding for new players */}
+      {game && <TutorialController gameInstance={game} />}
       
       {/* Audio elements for sound effects */}
       <audio id="background-music" src="/sounds/background.mp3" loop preload="auto"></audio>
