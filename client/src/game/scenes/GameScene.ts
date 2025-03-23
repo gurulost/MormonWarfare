@@ -1074,8 +1074,9 @@ export class GameScene extends Phaser.Scene {
               }
             }
             
-            // Clear prediction status
-            unit.isPredicted = false;
+            // Clear prediction status using our new method
+            unit.clearPrediction();
+            console.log(`Clearing prediction for unit ${unitId} - server confirmed position`);
           }
           
           // Update unit health and other attributes

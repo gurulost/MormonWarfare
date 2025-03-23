@@ -373,7 +373,14 @@ export class UnitManager {
         if (path.length > 0) {
           // Set prediction flag on unit if this is a client prediction
           if (isPrediction) {
-            unit.isPredicted = true;
+            // Create a unique action ID for this movement prediction
+            const actionId = `move_${unit.id}_${Date.now()}`;
+            
+            // Apply prediction visualization
+            unit.setPredicted(actionId);
+            
+            // Log the prediction for debugging
+            console.log(`Setting predicted movement for unit ${unit.id} to (${targetX}, ${targetY}) with actionId: ${actionId}`);
           }
           
           unit.setPath(path);

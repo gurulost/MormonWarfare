@@ -294,13 +294,14 @@ export const useMultiplayer = create<MultiplayerState>((set, get) => ({
     
     // Apply client-side prediction immediately if enabled
     if (clientPrediction) {
-      console.log("Applying client-side prediction for unit movement");
+      console.log("Applying client-side prediction for unit movement with actionId:", actionId);
       notifyGameEventListeners({
         type: "unitMove",
         unitIds,
         targetX,
         targetY,
-        isPrediction: true
+        isPrediction: true,
+        actionId  // Pass the actionId to the prediction event
       });
     }
   },
@@ -572,7 +573,8 @@ function processStateUpdate(changes: any, timestamp: number) {
               targetX: action.data.targetX,
               targetY: action.data.targetY,
               isPrediction: true,
-              isReapplied: true
+              isReapplied: true,
+              actionId: action.data.actionId // Include the action ID for tracking
             });
           }
           // Add other action types as needed
