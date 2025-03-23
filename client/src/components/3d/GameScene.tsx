@@ -2,7 +2,8 @@ import React, { useRef, useEffect, useState, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { 
   OrbitControls, 
-  PerspectiveCamera, 
+  PerspectiveCamera,
+  OrthographicCamera, 
   Environment, 
   Sky, 
   useHelper,
@@ -263,7 +264,7 @@ const SceneLighting = () => {
 };
 
 // Main Game Scene Component
-// Camera controller component with smooth transitions
+// Enhanced camera controller with additional RTS-friendly features
 const CameraController = ({ 
   target, 
   initialPosition, 
@@ -278,28 +279,55 @@ const CameraController = ({
   const [cameraMoving, setCameraMoving] = useState(false);
   const [cameraTarget, setCameraTarget] = useState<[number, number, number]>(target);
   const [rotationAngle, setRotationAngle] = useState(0);
+  const [useOrthographic, setUseOrthographic] = useState(false);
   
-  // Handle camera rotation animation
+  // Camera boundary constraints
+  const mapBounds = {
+    minX: -mapSize * 0.1,
+    maxX: mapSize * 1.1,
+    minZ: -mapSize * 0.1,
+    maxZ: mapSize * 1.1,
+    minY: 2, // Minimum height
+    maxY: mapSize * 1.2 // Maximum height
+  };
+  
+  // Handle camera rotation animation and boundaries
   useFrame((state, delta) => {
-    if (cameraRotating && controlsRef.current) {
+    if (!controlsRef.current) return;
+    
+    // Enforce camera boundaries
+    const camera = state.camera;
+    const target = controlsRef.current.target;
+    
+    // Clamp target position to map bounds
+    target.x = Math.max(mapBounds.minX, Math.min(target.x, mapBounds.maxX));
+    target.z = Math.max(mapBounds.minZ, Math.min(target.z, mapBounds.maxZ));
+    target.y = Math.max(0, Math.min(target.y, 5)); // Limit vertical target to avoid awkward angles
+    
+    // Clamp camera height
+    camera.position.y = Math.max(mapBounds.minY, Math.min(camera.position.y, mapBounds.maxY));
+    
+    // Handle rotation animation
+    if (cameraRotating) {
       // Perform smooth rotation around target
       setRotationAngle(prev => {
-        const newAngle = prev + delta * 0.5; // Adjust speed
+        const newAngle = prev + delta * 0.3; // Reduced speed for smoother rotation
         
         // Update camera position based on rotation
         const radius = mapSize * 0.8;
-        const height = mapSize * 0.7;
+        const height = mapSize * 0.6;
         const x = Math.sin(newAngle) * radius + mapSize / 2;
         const z = Math.cos(newAngle) * radius + mapSize / 2;
         
-        // Update controls target
+        // Keep the target centered on the map
         controlsRef.current.target.set(mapSize / 2, 0, mapSize / 2);
         
         return newAngle;
       });
     }
     
-    if (cameraMoving && controlsRef.current) {
+    // Handle moving to a specific target
+    if (cameraMoving) {
       // Smoothly interpolate camera target
       const currentTarget = controlsRef.current.target;
       currentTarget.x += (cameraTarget[0] - currentTarget.x) * 0.05;
@@ -328,12 +356,63 @@ const CameraController = ({
     setCameraMoving(true);
   };
   
+  // Toggle between perspective and orthographic cameras
+  const toggleCameraType = () => {
+    setUseOrthographic(prev => !prev);
+  };
+  
+  // Top-down RTS view preset
+  const setTopDownView = () => {
+    if (controlsRef.current) {
+      // Position camera directly above the center of the map
+      const camera = controlsRef.current.object;
+      const target = controlsRef.current.target;
+      
+      // Set target to map center
+      target.set(mapSize / 2, 0, mapSize / 2);
+      
+      // Position camera above the map
+      const height = mapSize * 0.7;
+      camera.position.set(mapSize / 2, height, mapSize / 2);
+      
+      // Look straight down
+      camera.lookAt(target);
+      
+      // Stop any ongoing rotation
+      setCameraRotating(false);
+    }
+  };
+  
+  // Strategic angled view preset (classic RTS view)
+  const setStrategicView = () => {
+    if (controlsRef.current) {
+      // Position camera at an angle commonly used in RTS games
+      const camera = controlsRef.current.object;
+      const target = controlsRef.current.target;
+      
+      // Set target to map center
+      target.set(mapSize / 2, 0, mapSize / 2);
+      
+      // Position camera at a strategic angle
+      camera.position.set(mapSize * 0.3, mapSize * 0.5, mapSize * 0.8);
+      
+      // Look at the center
+      camera.lookAt(target);
+      
+      // Stop any ongoing rotation
+      setCameraRotating(false);
+    }
+  };
+  
   // Effect to expose camera control methods globally
   useEffect(() => {
     // Expose camera controls to parent component via a global object
     (window as any).cameraControls = {
       rotateCameraAround,
       focusOnPosition,
+      toggleCameraType,
+      setTopDownView,
+      setStrategicView,
       resetCamera: () => {
         if (controlsRef.current) {
           controlsRef.current.target.set(mapSize / 2, 0, mapSize / 2);
@@ -346,23 +425,48 @@ const CameraController = ({
       // Clean up global object
       (window as any).cameraControls = null;
     };
-  }, [mapSize]);
+  }, [mapSize, useOrthographic]);
   
   return (
     <>
-      <PerspectiveCamera 
-        makeDefault 
-        position={initialPosition} 
-        fov={45}
-      />
+      {useOrthographic ? (
+        // Orthographic camera for top-down strategic view without perspective distortion
+        <OrthographicCamera
+          makeDefault
+          position={initialPosition}
+          zoom={5}
+          near={1}
+          far={mapSize * 2}
+          left={-mapSize / 2}
+          right={mapSize / 2}
+          top={mapSize / 2}
+          bottom={-mapSize / 2}
+        />
+      ) : (
+        // Perspective camera with moderate FOV for better depth perception
+        <PerspectiveCamera 
+          makeDefault 
+          position={initialPosition} 
+          fov={40} // Reduced FOV for less distortion
+          near={1}
+          far={mapSize * 2}
+        />
+      )}
+      
+      {/* Enhanced controls with better constraints */}
       <OrbitControls 
         ref={controlsRef}
         target={[mapSize / 2, 0, mapSize / 2]}
-        maxPolarAngle={Math.PI / 2 - 0.1} // Prevent camera from going below ground
-        minDistance={5}
-        maxDistance={mapSize * 1.5}
-        enableDamping
+        maxPolarAngle={Math.PI / 2 - 0.1} // Prevent going below ground
+        minPolarAngle={Math.PI / 12} // Prevent looking straight down from top - better for RTS
+        minDistance={5} // Minimum zoom distance
+        maxDistance={mapSize * 1.2} // Maximum zoom distance
+        enableDamping // Smooth movement
         dampingFactor={0.1}
+        rotateSpeed={0.7} // Slower rotation for better control
+        zoomSpeed={0.8} // Adjusted zoom speed
+        panSpeed={0.8} // Adjusted pan speed
+        screenSpacePanning={true} // More intuitive panning
       />
     </>
   );
@@ -413,6 +517,24 @@ export const GameScene = ({
   const handleResetCameraClick = () => {
     if ((window as any).cameraControls) {
       (window as any).cameraControls.resetCamera();
+    }
+  };
+  
+  const handleToggleCameraTypeClick = () => {
+    if ((window as any).cameraControls) {
+      (window as any).cameraControls.toggleCameraType();
+    }
+  };
+  
+  const handleTopDownViewClick = () => {
+    if ((window as any).cameraControls) {
+      (window as any).cameraControls.setTopDownView();
+    }
+  };
+  
+  const handleStrategicViewClick = () => {
+    if ((window as any).cameraControls) {
+      (window as any).cameraControls.setStrategicView();
     }
   };
   
@@ -467,6 +589,63 @@ export const GameScene = ({
               gap: "10px"
             }}
           >
+            {/* Camera type toggle */}
+            <button
+              onClick={handleToggleCameraTypeClick}
+              style={{
+                padding: "8px 12px",
+                backgroundColor: "#4a9e2a",
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                cursor: "pointer",
+                fontWeight: "bold"
+              }}
+            >
+              Toggle Perspective/Ortho
+            </button>
+            
+            {/* Camera view presets */}
+            <div style={{ 
+              display: "flex", 
+              gap: "5px", 
+              justifyContent: "space-between",
+              marginBottom: "5px"
+            }}>
+              <button
+                onClick={handleTopDownViewClick}
+                style={{
+                  padding: "8px 12px",
+                  flex: 1,
+                  backgroundColor: "#2a4d9e",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                  fontSize: "0.9em"
+                }}
+              >
+                Top-Down
+              </button>
+              
+              <button
+                onClick={handleStrategicViewClick}
+                style={{
+                  padding: "8px 12px",
+                  flex: 1,
+                  backgroundColor: "#2a4d9e",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                  fontSize: "0.9em"
+                }}
+              >
+                Strategic
+              </button>
+            </div>
+            
+            {/* Camera motion controls */}
             <button
               onClick={handleRotateCameraClick}
               style={{
@@ -494,6 +673,19 @@ export const GameScene = ({
             >
               Reset View
             </button>
+            
+            {/* Display camera hint */}
+            <div style={{
+              marginTop: "5px",
+              padding: "5px",
+              backgroundColor: "rgba(255,255,255,0.1)",
+              borderRadius: "4px",
+              fontSize: "0.8em",
+              color: "#ddd"
+            }}>
+              <p>Tip: Use mouse wheel to zoom in/out</p>
+              <p>Right-click drag to rotate camera</p>
+            </div>
           </div>
         )}
       </div>
