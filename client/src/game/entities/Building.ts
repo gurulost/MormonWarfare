@@ -21,6 +21,11 @@ export class Building {
   productionQueue: { type: string; remainingTime: number }[];
   size: number;
   
+  // 3D model properties
+  useCustomModel: boolean = false;
+  modelPath: string | null = null;
+  modelInstance: any = null; // Will hold three.js model reference when in 3D view
+  
   // Production UI elements
   productionBar: Phaser.GameObjects.Rectangle | null = null;
   productionBarBg: Phaser.GameObjects.Rectangle | null = null;
@@ -70,69 +75,173 @@ export class Building {
     const container = scene.add.container(this.x, this.y);
     
     // Determine color based on player and building type
-    let colorMain = 0x0000ff; // Default blue for Nephites
+    let colorMain = 0x3366cc; // Default blue for Nephites (updated to match units)
     let colorSecondary = 0xaaaaff;
     
     if (this.faction === "Lamanites") {
-      colorMain = 0xff0000; // Red for Lamanites
+      colorMain = 0xcc3300; // Red for Lamanites (updated to match units)
       colorSecondary = 0xffaaaa;
     }
     
-    // Draw different shapes based on building type
-    let buildingShape: Phaser.GameObjects.Shape;
-    let buildingText: Phaser.GameObjects.Text;
+    // Special faction-specific buildings use custom 3D models
+    if (this.type === "nephiteTemple" && this.faction === "Nephites") {
+      // Use the Nephite Temple 3D model
+      this.useCustomModel = true;
+      this.modelPath = '/models/nephite_temple.glb';
+      
+      // Create a temporary placeholder for the 2D view
+      const templePoly = [
+        { x: 0, y: -30 },          // Top point
+        { x: 30, y: -10 },         // Upper right
+        { x: 25, y: 20 },          // Lower right
+        { x: -25, y: 20 },         // Lower left
+        { x: -30, y: -10 }         // Upper left
+      ];
+      
+      const buildingShape = scene.add.polygon(0, 0, templePoly, colorMain);
+      
+      // Add temple details
+      const stepsPoly = [
+        { x: 0, y: 5 },            // Top center
+        { x: 20, y: 10 },          // Upper right
+        { x: 15, y: 25 },          // Lower right
+        { x: -15, y: 25 },         // Lower left
+        { x: -20, y: 10 }          // Upper left
+      ];
+      const steps = scene.add.polygon(0, 0, stepsPoly, 0xeeeedd); // Light stone color
+      
+      // Add altar symbol
+      const altar = scene.add.circle(0, -15, 5, 0xffcc00); // Gold color
+      
+      // Temple text
+      const buildingText = scene.add.text(0, 0, "TMPL", {
+        fontFamily: "monospace",
+        fontSize: "12px",
+        color: "#ffffff",
+        stroke: "#000000",
+        strokeThickness: 1
+      }).setOrigin(0.5);
+      
+      // Add sacred aura (subtle glow)
+      const aura = scene.add.circle(0, 0, 35, 0xffcc00, 0.2)
+        .setStrokeStyle(1, 0xffcc00);
+      
+      // Selection indicator (hidden by default)
+      const selectionRect = scene.add.rectangle(
+        0, 0, 
+        this.size * 25, 
+        this.size * 25, 
+        0xffff00, 0
+      ).setStrokeStyle(2, 0xffff00);
+      
+      // Add everything to the container
+      container.add([aura, buildingShape, steps, altar, buildingText, selectionRect]);
     
-    if (this.type === "cityCenter") {
-      // City center is a large square
-      buildingShape = scene.add.rectangle(0, 0, this.size * 20, this.size * 20, colorMain);
-      buildingText = scene.add.text(0, 0, "CITY", {
+    } else if (this.type === "lamaniteTower" && this.faction === "Lamanites") {
+      // Use the Lamanite Watch Tower 3D model
+      this.useCustomModel = true;
+      this.modelPath = '/models/lamanite_tower.glb';
+      
+      // Create a temporary placeholder for the 2D view
+      const towerBase = scene.add.rectangle(0, 10, 25, 20, 0x886655); // Brown base
+      const towerTop = scene.add.rectangle(0, -12, 15, 15, colorMain); // Red top platform
+      
+      // Add tower pole
+      const pole = scene.add.rectangle(0, 0, 5, 40, 0x663300); // Dark wood
+      
+      // Add tribal decorations
+      const flag1 = scene.add.triangle(10, -15, 0, 0, 0, 10, 15, 5, 0xff9900); // Orange flag
+      const flag2 = scene.add.triangle(-10, -10, 0, 0, 0, 10, -15, 5, 0xff9900); // Orange flag
+      
+      // Tower text
+      const buildingText = scene.add.text(0, 0, "TOWR", {
         fontFamily: "monospace",
-        fontSize: "14px",
-        color: "#ffffff"
+        fontSize: "12px",
+        color: "#ffffff",
+        stroke: "#000000",
+        strokeThickness: 1
       }).setOrigin(0.5);
-    } else if (this.type === "barracks") {
-      // Barracks is a rectangle
-      buildingShape = scene.add.rectangle(0, 0, this.size * 20, this.size * 15, colorMain);
-      buildingText = scene.add.text(0, 0, "BRK", {
-        fontFamily: "monospace",
-        fontSize: "14px",
-        color: "#ffffff"
-      }).setOrigin(0.5);
-    } else if (this.type === "archeryRange") {
-      // Archery range is a pentagon
-      const radius = this.size * 10;
-      buildingShape = scene.add.polygon(0, 0, [
-        { x: 0, y: -radius },
-        { x: radius * 0.95, y: -radius * 0.3 },
-        { x: radius * 0.58, y: radius * 0.8 },
-        { x: -radius * 0.58, y: radius * 0.8 },
-        { x: -radius * 0.95, y: -radius * 0.3 }
-      ], colorMain);
-      buildingText = scene.add.text(0, 0, "ARC", {
-        fontFamily: "monospace",
-        fontSize: "14px",
-        color: "#ffffff"
-      }).setOrigin(0.5);
+      
+      // Add vision range indicator
+      const visionRange = scene.add.circle(0, 0, 40, 0xff9900, 0.1)
+        .setStrokeStyle(1, 0xff9900);
+      
+      // Selection indicator (hidden by default)
+      const selectionRect = scene.add.rectangle(
+        0, 0, 
+        this.size * 25, 
+        this.size * 25, 
+        0xffff00, 0
+      ).setStrokeStyle(2, 0xffff00);
+      
+      // Add everything to the container
+      container.add([visionRange, towerBase, pole, towerTop, flag1, flag2, buildingText, selectionRect]);
+    
     } else {
-      // Generic building shape for other types
-      buildingShape = scene.add.rectangle(0, 0, this.size * 20, this.size * 20, colorMain);
-      buildingText = scene.add.text(0, 0, "BLD", {
-        fontFamily: "monospace",
-        fontSize: "14px",
-        color: "#ffffff"
-      }).setOrigin(0.5);
+      // Regular buildings use standard shapes
+      let buildingShape: Phaser.GameObjects.Shape;
+      let buildingText: Phaser.GameObjects.Text;
+      
+      if (this.type === "cityCenter") {
+        // City center is a large square
+        buildingShape = scene.add.rectangle(0, 0, this.size * 20, this.size * 20, colorMain);
+        buildingText = scene.add.text(0, 0, "CITY", {
+          fontFamily: "monospace",
+          fontSize: "14px",
+          color: "#ffffff"
+        }).setOrigin(0.5);
+      } else if (this.type === "barracks") {
+        // Barracks is a rectangle
+        buildingShape = scene.add.rectangle(0, 0, this.size * 20, this.size * 15, colorMain);
+        buildingText = scene.add.text(0, 0, "BRK", {
+          fontFamily: "monospace",
+          fontSize: "14px",
+          color: "#ffffff"
+        }).setOrigin(0.5);
+      } else if (this.type === "archeryRange") {
+        // Archery range is a pentagon
+        const radius = this.size * 10;
+        buildingShape = scene.add.polygon(0, 0, [
+          { x: 0, y: -radius },
+          { x: radius * 0.95, y: -radius * 0.3 },
+          { x: radius * 0.58, y: radius * 0.8 },
+          { x: -radius * 0.58, y: radius * 0.8 },
+          { x: -radius * 0.95, y: -radius * 0.3 }
+        ], colorMain);
+        buildingText = scene.add.text(0, 0, "ARC", {
+          fontFamily: "monospace",
+          fontSize: "14px",
+          color: "#ffffff"
+        }).setOrigin(0.5);
+      } else if (this.type === "wall") {
+        // Wall is a long rectangle
+        buildingShape = scene.add.rectangle(0, 0, this.size * 30, this.size * 5, colorMain);
+        buildingText = scene.add.text(0, 0, "WALL", {
+          fontFamily: "monospace",
+          fontSize: "10px",
+          color: "#ffffff"
+        }).setOrigin(0.5);
+      } else {
+        // Generic building shape for other types
+        buildingShape = scene.add.rectangle(0, 0, this.size * 20, this.size * 20, colorMain);
+        buildingText = scene.add.text(0, 0, "BLD", {
+          fontFamily: "monospace",
+          fontSize: "14px",
+          color: "#ffffff"
+        }).setOrigin(0.5);
+      }
+      
+      // Selection indicator (hidden by default)
+      const selectionRect = scene.add.rectangle(
+        0, 0, 
+        this.size * 25, 
+        this.size * 25, 
+        0xffff00, 0
+      ).setStrokeStyle(2, 0xffff00);
+      
+      // Add everything to the container
+      container.add([buildingShape, buildingText, selectionRect]);
     }
-    
-    // Selection indicator (hidden by default)
-    const selectionRect = scene.add.rectangle(
-      0, 0, 
-      this.size * 25, 
-      this.size * 25, 
-      0xffff00, 0
-    ).setStrokeStyle(2, 0xffff00);
-    
-    // Add everything to the container
-    container.add([buildingShape, buildingText, selectionRect]);
     
     return container;
   }
@@ -169,6 +278,20 @@ export class Building {
         defense: 20,
         size: 1
       };
+    } else if (this.type === "nephiteTemple") {
+      // Nephite Temple - provides faith bonuses and special unit production
+      stats = {
+        health: 750,
+        defense: 15,
+        size: 3
+      };
+    } else if (this.type === "lamaniteTower") {
+      // Lamanite Watch Tower - provides increased vision and scouting abilities
+      stats = {
+        health: 500,
+        defense: 8,
+        size: 2
+      };
     }
     
     // Apply faction bonuses
@@ -178,6 +301,21 @@ export class Building {
       if (this.type === "wall") {
         // Nephites excel at defense
         stats.health += 200;
+      }
+      if (this.type === "nephiteTemple") {
+        // Temples are sacred and hard to destroy
+        stats.defense += 10;
+      }
+    } else if (this.faction === "Lamanites") {
+      // Lamanites have more offensive structures
+      if (this.type === "lamaniteTower") {
+        // Watch towers are built for spotting enemies
+        stats.size += 1; // Taller towers
+      }
+      if (this.type === "barracks") {
+        // Lamanite barracks produce units faster (handled elsewhere)
+        // But are slightly less durable
+        stats.health -= 50;
       }
     }
     
@@ -275,11 +413,14 @@ export class Building {
    */
   private getColorForUnitType(type: string): number {
     switch (type) {
-      case "worker": return 0x33cc33; // Green for workers
-      case "melee": return 0xcc3333;  // Red for melee
-      case "ranged": return 0x3333cc; // Blue for ranged
-      case "hero": return 0xffcc00;   // Gold for hero
-      default: return 0xaaaaaa;       // Gray for unknown
+      case "worker": return 0x33cc33;            // Green for workers
+      case "melee": return 0xcc3333;             // Red for melee
+      case "ranged": return 0x3333cc;            // Blue for ranged
+      case "cavalry": return 0xcc66cc;           // Purple for cavalry
+      case "hero": return 0xffcc00;              // Gold for hero
+      case "striplingWarrior": return 0xffdd44;  // Bright gold for Stripling Warriors
+      case "lamaniteScout": return 0xff9900;     // Orange for Lamanite Scouts
+      default: return 0xaaaaaa;                  // Gray for unknown
     }
   }
   
@@ -291,7 +432,10 @@ export class Building {
       case "worker": return "W";
       case "melee": return "M";  
       case "ranged": return "R";
+      case "cavalry": return "C";
       case "hero": return "H";
+      case "striplingWarrior": return "SW";
+      case "lamaniteScout": return "SC";
       default: return "?";
     }
   }
@@ -302,7 +446,9 @@ export class Building {
   private canProduce(): boolean {
     return this.type === "cityCenter" || 
            this.type === "barracks" || 
-           this.type === "archeryRange";
+           this.type === "archeryRange" ||
+           this.type === "nephiteTemple" || // Nephite temple can produce Stripling Warriors
+           this.type === "lamaniteTower";   // Lamanite tower can produce Scout units
   }
   
   update(delta: number) {
@@ -379,17 +525,53 @@ export class Building {
   }
   
   getProductionTime(type: string): number {
-    // Time in milliseconds
+    // Base production time in milliseconds
+    let baseTime = 10000; // Default 10 seconds
+    
     switch (type) {
       case "worker":
-        return 10000; // 10 seconds
+        baseTime = 10000; // 10 seconds
+        break;
       case "melee":
-        return 15000; // 15 seconds
+        baseTime = 15000; // 15 seconds
+        break;
       case "ranged":
-        return 20000; // 20 seconds
-      default:
-        return 10000;
+        baseTime = 20000; // 20 seconds
+        break;
+      case "striplingWarrior":
+        baseTime = 25000; // 25 seconds - elite unit takes longer
+        break;
+      case "lamaniteScout":
+        baseTime = 12000; // 12 seconds - scout unit is faster to produce
+        break;
+      case "cavalry": 
+        baseTime = 30000; // 30 seconds - cavalry takes longer
+        break;
+      case "hero":
+        baseTime = 60000; // 60 seconds - hero units take a long time
+        break;
     }
+    
+    // Apply faction-specific production time modifiers
+    if (this.faction === "Nephites") {
+      // Nephite-specific production bonuses
+      if (this.type === "nephiteTemple" && type === "striplingWarrior") {
+        // Temples produce Stripling Warriors faster
+        baseTime *= 0.8; // 20% faster
+      }
+    } else if (this.faction === "Lamanites") {
+      // Lamanite-specific production bonuses
+      if (this.type === "barracks" && (type === "melee" || type === "ranged")) {
+        // Lamanites produce combat units faster from barracks
+        baseTime *= 0.85; // 15% faster
+      }
+      if (this.type === "lamaniteTower" && type === "lamaniteScout") {
+        // Watch Towers produce scouts even faster
+        baseTime *= 0.7; // 30% faster
+      }
+    }
+    
+    return baseTime;
   }
   
   cancelProduction(index: number) {

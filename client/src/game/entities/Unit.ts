@@ -30,6 +30,11 @@ export class Unit {
   isAttacking: boolean;
   isGatheringAnimationPlaying: boolean;
   
+  // 3D model properties
+  useCustomModel: boolean = false;
+  modelPath: string | null = null;
+  modelInstance: any = null; // Will hold three.js model reference when in 3D view
+  
   // Faction ability effects
   defenseMultiplier: number = 1;
   attackMultiplier: number = 1;
@@ -147,154 +152,242 @@ export class Unit {
       colorAccent = 0xff9900; // Orange accent for Lamanites (represents war paint)
     }
     
-    // Create base shape based on unit type
-    let unitShape: Phaser.GameObjects.Shape;
-    let unitSymbol: Phaser.GameObjects.Text;
-    let unitDetails: Phaser.GameObjects.Shape[] = [];
-    
-    if (this.type === "worker") {
-      // Worker - represents common people/laborers in the Book of Mormon
-      unitShape = scene.add.circle(0, 0, 10, colorMain);
+    // Special unit types get custom 3D model representations
+    if (this.type === "striplingWarrior" && this.faction === "Nephites") {
+      // Use the Stripling Warrior 3D model
+      this.useCustomModel = true;
+      this.modelPath = '/models/stripling_warrior.glb';
       
-      // Add farming/building tool symbol
-      const tool = scene.add.rectangle(-5, 0, 2, 14, colorTrim)
-        .setRotation(Math.PI / 6);
-      unitDetails.push(tool);
+      // Create a temporary placeholder for the 2D view
+      const unitShape = scene.add.star(0, 0, 5, 10, 16, colorMain);
       
-      // Worker symbol
-      unitSymbol = scene.add.text(0, -2, "W", {
+      // Add shield detail (Stripling Warriors are known for their faith/protection)
+      const shield = scene.add.circle(-6, 0, 8, 0xffcc00, 0.5)
+        .setStrokeStyle(1, 0xffffff);
+      
+      // Add weapon detail
+      const sword = scene.add.rectangle(8, -2, 12, 2, 0xdddddd)
+        .setRotation(Math.PI / 4);
+      
+      // Stripling Warrior symbol
+      const unitSymbol = scene.add.text(0, -2, "SW", {
         fontFamily: "monospace",
         fontSize: "10px",
-        color: "#ffffff"
-      }).setOrigin(0.5);
-      
-    } else if (this.type === "melee") {
-      // Melee unit - represents warriors in the Book of Mormon
-      unitShape = scene.add.rectangle(0, 0, 20, 20, colorMain);
-      
-      // Add shield detail
-      const shield = scene.add.rectangle(-6, 0, 6, 12, colorTrim);
-      unitDetails.push(shield);
-      
-      // Add weapon detail (sword or spear)
-      const weapon = scene.add.rectangle(8, -2, 12, 2, colorAccent)
-        .setRotation(Math.PI / 4);
-      unitDetails.push(weapon);
-      
-      // Melee unit symbol
-      unitSymbol = scene.add.text(0, -2, "M", {
-        fontFamily: "monospace",
-        fontSize: "12px",
         color: "#ffffff",
         stroke: "#000000",
         strokeThickness: 1
       }).setOrigin(0.5);
       
-    } else if (this.type === "ranged") {
-      // Ranged unit - represents archers in the Book of Mormon
-      unitShape = scene.add.triangle(0, 0, 0, -14, 10, 10, -10, 10, colorMain);
+      // Add faith shield visual effect (subtle glow)
+      const faithShield = scene.add.circle(0, 0, 20, 0xffcc00, 0.2)
+        .setStrokeStyle(1, 0xffd700);
       
-      // Add bow detail
-      const bow = scene.add.ellipse(0, 0, 6, 20, colorTrim);
-      // Add arrow detail
-      const arrow = scene.add.rectangle(6, 0, 14, 1, colorAccent);
-      unitDetails.push(bow, arrow);
+      // Selection indicator
+      const selectionCircle = scene.add.circle(0, 0, 22, 0xffff00, 0)
+        .setStrokeStyle(2, 0xffff00);
       
-      // Ranged unit symbol
-      unitSymbol = scene.add.text(0, -2, "R", {
+      // Add everything to the container
+      container.add([unitShape, shield, sword, faithShield, unitSymbol, selectionCircle]);
+      
+    } else if (this.type === "lamaniteScout" && this.faction === "Lamanites") {
+      // Use the Lamanite Scout 3D model
+      this.useCustomModel = true;
+      this.modelPath = '/models/lamanite_scout.glb';
+      
+      // Create a temporary placeholder for the 2D view
+      const unitShape = scene.add.triangle(0, 0, 0, -14, 12, 8, -12, 8, colorMain);
+      
+      // Add bow and arrow details
+      const bow = scene.add.ellipse(0, 0, 5, 18, colorTrim);
+      const arrow = scene.add.rectangle(6, 0, 12, 1, colorAccent);
+      
+      // Add stealth visual indicators (slightly transparent)
+      const stealthEffect = scene.add.circle(0, 0, 18, 0x000000, 0.3);
+      
+      // Scout symbol
+      const unitSymbol = scene.add.text(0, -2, "SC", {
         fontFamily: "monospace",
-        fontSize: "12px",
+        fontSize: "10px",
         color: "#ffffff",
         stroke: "#000000",
         strokeThickness: 1
       }).setOrigin(0.5);
       
-    } else { // Hero unit
-      // Hero units are larger and more detailed
-      const heroSize = 24;
+      // Selection indicator
+      const selectionCircle = scene.add.circle(0, 0, 20, 0xffff00, 0)
+        .setStrokeStyle(2, 0xffff00);
       
-      if (this.faction === "Nephites") {
-        // Captain Moroni - Nephite hero
-        unitShape = scene.add.star(0, 0, 6, 12, heroSize, colorMain);
+      // Add everything to the container
+      container.add([unitShape, bow, arrow, stealthEffect, unitSymbol, selectionCircle]);
+      
+    } else {
+      // Standard unit types use existing 2D graphics
+      let unitShape: Phaser.GameObjects.Shape;
+      let unitSymbol: Phaser.GameObjects.Text;
+      let unitDetails: Phaser.GameObjects.Shape[] = [];
+      
+      if (this.type === "worker") {
+        // Worker - represents common people/laborers in the Book of Mormon
+        unitShape = scene.add.circle(0, 0, 10, colorMain);
         
-        // Add shield and sword
-        const shield = scene.add.rectangle(-8, 2, 8, 16, colorTrim);
-        const sword = scene.add.rectangle(8, -4, 20, 3, 0xdddddd)
+        // Add farming/building tool symbol
+        const tool = scene.add.rectangle(-5, 0, 2, 14, colorTrim)
           .setRotation(Math.PI / 6);
-        // Add banner (Title of Liberty)
-        const banner = scene.add.rectangle(3, -12, 4, 18, colorAccent);
+        unitDetails.push(tool);
         
-        unitDetails.push(shield, sword, banner);
-        
-        // Captain Moroni symbol
-        unitSymbol = scene.add.text(0, -3, "M", {
+        // Worker symbol
+        unitSymbol = scene.add.text(0, -2, "W", {
           fontFamily: "monospace",
-          fontSize: "14px",
-          color: "#ffffff",
-          stroke: "#000000",
-          strokeThickness: 2,
-          fontStyle: "bold"
+          fontSize: "10px",
+          color: "#ffffff"
         }).setOrigin(0.5);
         
-      } else { // Lamanites
-        // King Ammoron - Lamanite hero
-        // Create a polygon for the Lamanite hero (pentagon-like shape)
-        const pentagonPoints = [];
-        for (let i = 0; i < 5; i++) {
-          const angle = (i * Math.PI * 2 / 5) - (Math.PI / 2); // Start at top
-          pentagonPoints.push(Math.cos(angle) * heroSize);
-          pentagonPoints.push(Math.sin(angle) * heroSize);
+      } else if (this.type === "melee") {
+        // Melee unit - represents warriors in the Book of Mormon
+        unitShape = scene.add.rectangle(0, 0, 20, 20, colorMain);
+        
+        // Add shield detail
+        const shield = scene.add.rectangle(-6, 0, 6, 12, colorTrim);
+        unitDetails.push(shield);
+        
+        // Add weapon detail (sword or spear)
+        const weapon = scene.add.rectangle(8, -2, 12, 2, colorAccent)
+          .setRotation(Math.PI / 4);
+        unitDetails.push(weapon);
+        
+        // Melee unit symbol
+        unitSymbol = scene.add.text(0, -2, "M", {
+          fontFamily: "monospace",
+          fontSize: "12px",
+          color: "#ffffff",
+          stroke: "#000000",
+          strokeThickness: 1
+        }).setOrigin(0.5);
+        
+      } else if (this.type === "ranged") {
+        // Ranged unit - represents archers in the Book of Mormon
+        unitShape = scene.add.triangle(0, 0, 0, -14, 10, 10, -10, 10, colorMain);
+        
+        // Add bow detail
+        const bow = scene.add.ellipse(0, 0, 6, 20, colorTrim);
+        // Add arrow detail
+        const arrow = scene.add.rectangle(6, 0, 14, 1, colorAccent);
+        unitDetails.push(bow, arrow);
+        
+        // Ranged unit symbol
+        unitSymbol = scene.add.text(0, -2, "R", {
+          fontFamily: "monospace",
+          fontSize: "12px",
+          color: "#ffffff",
+          stroke: "#000000",
+          strokeThickness: 1
+        }).setOrigin(0.5);
+        
+      } else if (this.type === "cavalry") {
+        // Cavalry unit - represents mounted warriors
+        unitShape = scene.add.ellipse(0, 0, 24, 16, colorMain);
+        
+        // Add rider detail
+        const rider = scene.add.circle(0, -6, 7, colorTrim);
+        // Add spear/lance detail
+        const spear = scene.add.rectangle(12, -5, 18, 2, colorAccent)
+          .setRotation(Math.PI / 8);
+        unitDetails.push(rider, spear);
+        
+        // Cavalry unit symbol
+        unitSymbol = scene.add.text(0, -2, "C", {
+          fontFamily: "monospace",
+          fontSize: "12px",
+          color: "#ffffff",
+          stroke: "#000000",
+          strokeThickness: 1
+        }).setOrigin(0.5);
+        
+      } else { // Hero unit
+        // Hero units are larger and more detailed
+        const heroSize = 24;
+        
+        if (this.faction === "Nephites") {
+          // Captain Moroni - Nephite hero
+          unitShape = scene.add.star(0, 0, 6, 12, heroSize, colorMain);
+          
+          // Add shield and sword
+          const shield = scene.add.rectangle(-8, 2, 8, 16, colorTrim);
+          const sword = scene.add.rectangle(8, -4, 20, 3, 0xdddddd)
+            .setRotation(Math.PI / 6);
+          // Add banner (Title of Liberty)
+          const banner = scene.add.rectangle(3, -12, 4, 18, colorAccent);
+          
+          unitDetails.push(shield, sword, banner);
+          
+          // Captain Moroni symbol
+          unitSymbol = scene.add.text(0, -3, "M", {
+            fontFamily: "monospace",
+            fontSize: "14px",
+            color: "#ffffff",
+            stroke: "#000000",
+            strokeThickness: 2,
+            fontStyle: "bold"
+          }).setOrigin(0.5);
+          
+        } else { // Lamanites
+          // King Ammoron - Lamanite hero
+          // Create a polygon for the Lamanite hero (pentagon-like shape)
+          const pentagonPoints = [];
+          for (let i = 0; i < 5; i++) {
+            const angle = (i * Math.PI * 2 / 5) - (Math.PI / 2); // Start at top
+            pentagonPoints.push(Math.cos(angle) * heroSize);
+            pentagonPoints.push(Math.sin(angle) * heroSize);
+          }
+          unitShape = scene.add.polygon(0, 0, pentagonPoints, colorMain);
+          
+          // Add war club and headdress
+          const club = scene.add.rectangle(10, 0, 18, 5, colorTrim)
+            .setRotation(Math.PI / 3);
+          const headdress = scene.add.triangle(0, -10, 0, -5, 12, -20, -12, -20, colorAccent);
+          
+          unitDetails.push(club, headdress);
+          
+          // King Ammoron symbol
+          unitSymbol = scene.add.text(0, -3, "A", {
+            fontFamily: "monospace",
+            fontSize: "14px",
+            color: "#ffffff",
+            stroke: "#000000",
+            strokeThickness: 2,
+            fontStyle: "bold"
+          }).setOrigin(0.5);
         }
-        unitShape = scene.add.polygon(0, 0, pentagonPoints, colorMain);
         
-        // Add war club and headdress
-        const club = scene.add.rectangle(10, 0, 18, 5, colorTrim)
-          .setRotation(Math.PI / 3);
-        const headdress = scene.add.triangle(0, -10, 0, -5, 12, -20, -12, -20, colorAccent);
-        
-        unitDetails.push(club, headdress);
-        
-        // King Ammoron symbol
-        unitSymbol = scene.add.text(0, -3, "A", {
-          fontFamily: "monospace",
-          fontSize: "14px",
-          color: "#ffffff",
-          stroke: "#000000",
-          strokeThickness: 2,
-          fontStyle: "bold"
-        }).setOrigin(0.5);
+        // Special aura for hero units
+        const aura = scene.add.circle(0, 0, 28, this.faction === "Nephites" ? 0x3366cc : 0xcc3300, 0.2)
+          .setStrokeStyle(1, colorAccent);
+        container.add(aura);
       }
-    }
-    
-    // Faction-specific embellishments
-    if (this.faction === "Nephites") {
-      // Add Nephite emblem (based on descriptions of their standards/badges)
-      if (this.type !== "worker" && this.type !== "hero") {
-        const emblem = scene.add.circle(0, 5, 3, colorAccent);
-        unitDetails.push(emblem);
+      
+      // Faction-specific embellishments
+      if (this.faction === "Nephites") {
+        // Add Nephite emblem (based on descriptions of their standards/badges)
+        if (this.type !== "worker" && this.type !== "hero") {
+          const emblem = scene.add.circle(0, 5, 3, colorAccent);
+          unitDetails.push(emblem);
+        }
+      } else { // Lamanites
+        // Add Lamanite war markings
+        if (this.type !== "worker" && this.type !== "hero") {
+          const warMark = scene.add.rectangle(0, -6, 10, 2, colorAccent);
+          unitDetails.push(warMark);
+        }
       }
-    } else { // Lamanites
-      // Add Lamanite war markings
-      if (this.type !== "worker" && this.type !== "hero") {
-        const warMark = scene.add.rectangle(0, -6, 10, 2, colorAccent);
-        unitDetails.push(warMark);
-      }
+      
+      // Selection indicator (hidden by default)
+      const selectionRadius = this.type === "hero" ? 30 : 18;
+      const selectionCircle = scene.add.circle(0, 0, selectionRadius, 0xffff00, 0)
+        .setStrokeStyle(2, 0xffff00);
+      
+      // Add everything to the container
+      container.add([unitShape, ...unitDetails, unitSymbol, selectionCircle]);
     }
-    
-    // Special aura for hero units
-    if (this.type === "hero") {
-      const aura = scene.add.circle(0, 0, 28, this.faction === "Nephites" ? 0x3366cc : 0xcc3300, 0.2)
-        .setStrokeStyle(1, colorAccent);
-      container.add(aura);
-    }
-    
-    // Selection indicator (hidden by default)
-    const selectionRadius = this.type === "hero" ? 30 : 18;
-    const selectionCircle = scene.add.circle(0, 0, selectionRadius, 0xffff00, 0)
-      .setStrokeStyle(2, 0xffff00);
-    
-    // Add everything to the container
-    container.add([unitShape, ...unitDetails, unitSymbol, selectionCircle]);
     
     // Set interactive area (for mouse interactions)
     const interactiveSize = this.type === "hero" ? 40 : 30;
