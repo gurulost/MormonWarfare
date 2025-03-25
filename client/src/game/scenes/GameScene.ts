@@ -135,6 +135,30 @@ export class GameScene extends Phaser.Scene {
     // Setup multiplayer event listeners
     this.setupMultiplayerEvents();
     
+    // Setup UI event listeners for unit controls
+    this.events.on("setPatrolMode", (unitIds: string[]) => {
+      this.patrolMode = true;
+      this.attackMoveMode = false;
+      this.unitsForPatrol = unitIds;
+      this.patrolStartPoint = null;
+      
+      // Change cursor to indicate patrol mode
+      this.input.setDefaultCursor('crosshair');
+      
+      console.log("Patrol mode activated for units:", unitIds);
+    });
+    
+    this.events.on("setAttackMoveMode", (unitIds: string[]) => {
+      this.attackMoveMode = true;
+      this.patrolMode = false;
+      this.unitsForAttackMove = unitIds;
+      
+      // Change cursor to indicate attack-move mode
+      this.input.setDefaultCursor('crosshair');
+      
+      console.log("Attack-move mode activated for units:", unitIds);
+    });
+    
     // Play background music if enabled
     const audioStore = useAudio.getState();
     if (audioStore.backgroundMusic && !audioStore.isMuted) {
@@ -636,6 +660,68 @@ export class GameScene extends Phaser.Scene {
       // Skip if building placement is active
       if (this.buildingPlacementActive) return;
       
+      // Get tile coordinates
+      const tileX = Math.floor(pointer.worldX / TILE_SIZE);
+      const tileY = Math.floor(pointer.worldY / TILE_SIZE);
+      
+      // Check if we're in patrol mode
+      if (this.patrolMode && pointer.leftButtonDown()) {
+        // Handle patrol setting
+        if (!this.patrolStartPoint) {
+          // This is the first point of patrol path
+          this.patrolStartPoint = { x: tileX, y: tileY };
+          
+          // Show message
+          this.gameUI.showMessage("Now click on second patrol point");
+        } else {
+          // This is the second point, complete patrol setting
+          const endX = tileX;
+          const endY = tileY;
+          
+          // Set patrol for units
+          this.unitsForPatrol.forEach(unitId => {
+            const unit = this.unitManager.getUnit(unitId);
+            if (unit) {
+              unit.startPatrol(
+                this.patrolStartPoint!.x, 
+                this.patrolStartPoint!.y, 
+                endX, 
+                endY
+              );
+            }
+          });
+          
+          // Reset patrol mode
+          this.patrolMode = false;
+          this.patrolStartPoint = null;
+          this.input.setDefaultCursor('default');
+          
+          // Show confirmation
+          this.gameUI.showMessage("Patrol route set");
+        }
+        return;
+      }
+      
+      // Check if we're in attack-move mode
+      if (this.attackMoveMode && pointer.leftButtonDown()) {
+        // Set attack-move for units
+        this.unitsForAttackMove.forEach(unitId => {
+          const unit = this.unitManager.getUnit(unitId);
+          if (unit) {
+            unit.startAttackMove(tileX, tileY);
+          }
+        });
+        
+        // Reset attack-move mode
+        this.attackMoveMode = false;
+        this.input.setDefaultCursor('default');
+        
+        // Show confirmation
+        this.gameUI.showMessage("Attack-move order given");
+        return;
+      }
+      
+      // Standard selection handling
       if (pointer.leftButtonDown()) {
         this.selectionStart.x = pointer.worldX;
         this.selectionStart.y = pointer.worldY;
