@@ -192,10 +192,10 @@ export const useFactionAbilities = create<FactionAbilityState>((set, get) => ({
     console.log(`Activated faction ability: ${ability.name}`);
     
     // Display visual feedback
-    const event = new CustomEvent('abilityActivated', {
-      detail: { abilityId: id, abilityName: ability.name }
+    const event = new CustomEvent('ability-activated', {
+      detail: { abilityId: id, success: true, abilityName: ability.name }
     });
-    document.dispatchEvent(event);
+    window.dispatchEvent(event);
     
     return true;
   },

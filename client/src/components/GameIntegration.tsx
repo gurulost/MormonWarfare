@@ -298,6 +298,10 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
       const { abilityId } = event.detail;
       console.log(`Activating ability: ${abilityId}`);
       
+      // Log the current faction and all abilities
+      console.log(`Current faction: ${playerFaction}`);
+      console.log(`Available abilities:`, abilities);
+      
       // Find the ability data
       const ability = abilities.find(a => a.id === abilityId);
       if (!ability) return;
@@ -309,10 +313,13 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
         // Get all selected units
         const selectedUnits = selectedUnitIds.map((id: string) => gameScene.unitManager.getUnit(id)).filter(Boolean);
         
-        if (ability.id === 'faith-shield' && playerFaction === 'Nephites') {
+        if (ability.id === 'faithShield' && playerFaction === 'Nephites') {
           // Apply faith shield to selected Stripling Warriors
+          let validUnitFound = false;
+          
           selectedUnits.forEach((unit: any) => {
             if (unit.type === 'striplingWarrior') {
+              validUnitFound = true;
               unit.hasFaithShield = true;
               unit.usedFaithShield = false;
               
@@ -324,16 +331,23 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
             }
           });
           
-          // Dispatch event for successful activation
+          // Dispatch event based on whether any valid units were found
           const abilityEvent = new CustomEvent('ability-activated', { 
-            detail: { abilityId, success: true } 
+            detail: { abilityId, success: validUnitFound } 
           });
           window.dispatchEvent(abilityEvent);
+          
+          if (!validUnitFound) {
+            console.warn('No Stripling Warriors selected for Faith Shield ability');
+          }
         } 
         else if (ability.id === 'stealth' && playerFaction === 'Lamanites') {
           // Apply stealth to selected Lamanite scouts
+          let validUnitFound = false;
+          
           selectedUnits.forEach((unit: any) => {
             if (unit.type === 'lamaniteScout') {
+              validUnitFound = true;
               unit.isStealthed = true;
               
               // Create visual effect
@@ -344,11 +358,15 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
             }
           });
           
-          // Dispatch event for successful activation
+          // Dispatch event based on whether any valid units were found
           const abilityEvent = new CustomEvent('ability-activated', { 
-            detail: { abilityId, success: true } 
+            detail: { abilityId, success: validUnitFound } 
           });
           window.dispatchEvent(abilityEvent);
+          
+          if (!validUnitFound) {
+            console.warn('No Lamanite Scouts selected for Stealth ability');
+          }
         }
         else {
           console.warn(`Ability ${ability.id} not implemented or not applicable to selected units`);
