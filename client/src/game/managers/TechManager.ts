@@ -290,6 +290,31 @@ export class TechManager {
       researched: false
     });
     
+    // New Nephite unique unit and building technologies
+    this.addTech({
+      id: "striplingWarriors",
+      name: "Stripling Warriors",
+      description: "Train the sons of the people of Ammon, who are known for their faith and valor",
+      cost: TECH_COSTS.elite,
+      prerequisites: ["titleOfLiberty"],
+      effects: { unitHealth: 1.1, defense: 3 },
+      unlocks: { units: ["striplingWarrior"] },
+      faction: "Nephites",
+      researched: false
+    });
+    
+    this.addTech({
+      id: "templeBlessings",
+      name: "Temple Blessings",
+      description: "Construct a temple to receive spiritual guidance and protection in battle",
+      cost: TECH_COSTS.elite,
+      prerequisites: ["nephiteRecords"],
+      effects: { unitHealing: 1.5, defense: 2 },
+      unlocks: { buildings: ["nephiteTemple"] },
+      faction: "Nephites",
+      researched: false
+    });
+    
     // Lamanite special technologies
     this.addTech({
       id: "lamaniteAlliances",
@@ -299,6 +324,31 @@ export class TechManager {
       prerequisites: ["lamaniteAmbushTactics"],
       effects: { unitProductionSpeed: 1.3, unitProductionCost: 0.9 },
       unlocks: {},
+      faction: "Lamanites",
+      researched: false
+    });
+    
+    // New Lamanite unique unit and building technologies
+    this.addTech({
+      id: "scoutingParties",
+      name: "Scouting Parties",
+      description: "Train specialized scouts with the ability to remain hidden and gather intelligence",
+      cost: TECH_COSTS.elite,
+      prerequisites: ["lamaniteSwiftness"],
+      effects: { visionRange: 1.2, speed: 1.1 },
+      unlocks: { units: ["lamaniteScout"] },
+      faction: "Lamanites",
+      researched: false
+    });
+    
+    this.addTech({
+      id: "watchTowers",
+      name: "Watch Towers",
+      description: "Build specialized towers that grant vision advantages and boost nearby units' attack",
+      cost: TECH_COSTS.elite,
+      prerequisites: ["lamaniteOutposts"],
+      effects: { visionRange: 1.5, attack: 2 },
+      unlocks: { buildings: ["lamaniteTower"] },
       faction: "Lamanites",
       researched: false
     });
