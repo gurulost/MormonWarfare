@@ -472,6 +472,7 @@ export const EnhancedGameScene = ({
   const [showEffects, setShowEffects] = useState(true);
   const [enableGrid, setEnableGrid] = useState(false);
   const [hoverInfo, setHoverInfo] = useState<{ type: string; id: string; } | null>(null);
+  const [viewMode, setViewMode] = useState<'strategic' | 'overhead' | 'cinematic'>('strategic');
   
   // Calculate map size from data
   const mapSize = mapData.length;

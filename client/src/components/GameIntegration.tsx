@@ -82,7 +82,7 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
         }
         
         // Get selected buildings
-        const selectedBuildingsList = [];
+        const selectedBuildingsList: any[] = [];
         // We'll need to implement this in the game scene
         setSelectedBuildings(selectedBuildingsList);
         

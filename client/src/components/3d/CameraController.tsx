@@ -105,18 +105,20 @@ export const CameraController: React.FC<CameraControllerProps> = ({
     controls.zoomSpeed = preset.zoomSpeed;
     controls.panSpeed = preset.panSpeed;
     
-    // Update camera properties
-    camera.fov = preset.fov;
-    camera.near = preset.near;
-    camera.far = preset.far;
-    camera.updateProjectionMatrix();
+    // Update camera properties - check if it's PerspectiveCamera (which has fov)
+    if ('fov' in camera) {
+      camera.fov = preset.fov;
+      camera.near = preset.near;
+      camera.far = preset.far;
+      camera.updateProjectionMatrix();
+    }
     
     if (viewMode === 'cinematic') {
       // In cinematic mode, we might want to adjust the target
       controls.target.set(mapSize / 2, 2, mapSize / 2);
     } else {
       // Otherwise use the default target
-      controls.target = targetPosition;
+      controls.target.copy(targetPosition);
     }
     
     controls.update();
@@ -266,14 +268,18 @@ export const CameraController: React.FC<CameraControllerProps> = ({
     <>
       <PerspectiveCamera
         makeDefault
-        position={CAMERA_PRESETS[viewMode].position}
+        position={[
+          CAMERA_PRESETS[viewMode].position[0] as number,
+          CAMERA_PRESETS[viewMode].position[1] as number,
+          CAMERA_PRESETS[viewMode].position[2] as number
+        ] as [number, number, number]}
         fov={CAMERA_PRESETS[viewMode].fov}
         near={CAMERA_PRESETS[viewMode].near}
         far={CAMERA_PRESETS[viewMode].far}
       />
       <OrbitControls
         ref={controlsRef}
-        target={[mapSize / 2, 0, mapSize / 2]}
+        target={new THREE.Vector3(mapSize / 2, 0, mapSize / 2)}
         makeDefault
         enableDamping
         dampingFactor={0.1}
