@@ -189,8 +189,14 @@ export class CombatManager {
             }
           }
           
-          // Create visual damage indicator with appropriate style
-          this.createDamageIndicator(targetUnit.x, targetUnit.y, damage, hitType);
+          // Create hit impact effect first (shows the "hit" itself)
+          this.createHitImpactEffect(targetUnit.x, targetUnit.y, attackerType, defenderType);
+          
+          // Small delay before showing damage number for better visual sequence
+          this.scene.time.delayedCall(50, () => {
+            // Create visual damage indicator with appropriate style
+            this.createDamageIndicator(targetUnit.x, targetUnit.y, damage, hitType);
+          });
           
           // If target is killed, remove it
           if (killed) {
@@ -564,10 +570,14 @@ export class CombatManager {
     }
   }
   
+  /**
+   * Calculate damage based on attack, defense, and unit types with enhanced sound feedback
+   */
   private calculateDamage(attack: number, defense: number, attacker?: any, defender?: any): number {
     // Base damage is attack value
     let damage = attack;
     let damageMultiplier = 1.0;
+    let hitType: 'normal' | 'critical' | 'counter' | 'weak' = 'normal';
     
     // Apply counter system bonuses if both units are combat units
     if (attacker && defender) {
@@ -579,6 +589,7 @@ export class CombatManager {
       if (this.isCounterUnit(attackerType, defenderType)) {
         // This unit type counters the defending unit type
         damageMultiplier *= COUNTER_DAMAGE_MULTIPLIER;
+        hitType = 'counter';
         
         // Create a visual effect to show counter bonus
         this.createCounterEffectVisual(defender.x, defender.y, true);
@@ -590,11 +601,25 @@ export class CombatManager {
       if (this.isWeakToUnit(attackerType, defenderType)) {
         // Defending unit has advantage against attacking unit
         defense *= WEAKNESS_DAMAGE_MULTIPLIER;
+        hitType = 'weak';
         
         // Create a visual effect to show weakness
         this.createCounterEffectVisual(attacker.x, attacker.y, false);
         
         console.log(`Weakness penalty! ${attackerType} is weak against ${defenderType}`);
+      }
+      
+      // Check for critical hit (10% chance, higher for heroes)
+      const critChance = attackerType === 'hero' ? 0.15 : 0.1;
+      if (Math.random() < critChance && hitType === 'normal') {
+        // Critical hit - higher damage!
+        damageMultiplier *= 1.5;
+        hitType = 'critical';
+        
+        // Add camera shake for critical hits
+        this.scene.cameras.main.shake(100, 0.003);
+        
+        console.log(`Critical hit! ${Math.round(damage * damageMultiplier)} damage`);
       }
     }
     
@@ -606,6 +631,25 @@ export class CombatManager {
     
     // Add some randomness (reduced from 40% to 30% variance for more consistent outcomes)
     damage = Math.floor(damage * (0.85 + Math.random() * 0.3));
+    
+    // Play the appropriate sound based on hit type
+    const audioStore = useAudio.getState();
+    if (!audioStore.isMuted) {
+      switch (hitType) {
+        case 'critical':
+          audioStore.playCriticalHit();
+          break;
+        case 'counter':
+          audioStore.playCounterAttack();
+          break;
+        case 'weak':
+          audioStore.playWeaknessHit();
+          break;
+        default:
+          audioStore.playHit();
+          break;
+      }
+    }
     
     return damage;
   }
@@ -636,16 +680,6 @@ export class CombatManager {
    * Creates a visual effect to show counter advantage or weakness
    */
   private createCounterEffectVisual(x: number, y: number, isCounterBonus: boolean): void {
-    // Play the appropriate sound
-    const audioStore = useAudio.getState();
-    if (!audioStore.isMuted) {
-      if (isCounterBonus) {
-        audioStore.playCounterAttack();
-      } else {
-        audioStore.playWeaknessHit();
-      }
-    }
-    
     // Create a text effect to show counter or weakness with enhanced visual style
     const text = this.scene.add.text(
       x, 

@@ -262,16 +262,32 @@ export class MainMenuScene extends Phaser.Scene {
   }
   
   private initializeBackgroundMusic() {
-    // Get the HTML audio element
+    // Get the HTML audio elements
     const musicElement = document.getElementById("background-music") as HTMLAudioElement;
     const hitSoundElement = document.getElementById("hit-sound") as HTMLAudioElement;
     const successSoundElement = document.getElementById("success-sound") as HTMLAudioElement;
+    const criticalHitSoundElement = document.getElementById("critical-hit-sound") as HTMLAudioElement;
+    const counterAttackSoundElement = document.getElementById("counter-attack-sound") as HTMLAudioElement;
+    const weaknessHitSoundElement = document.getElementById("weakness-hit-sound") as HTMLAudioElement;
+    const deathSoundElement = document.getElementById("death-sound") as HTMLAudioElement;
     
-    // Set up the audio store
+    // Adjust volume for special sounds
+    if (criticalHitSoundElement) criticalHitSoundElement.volume = 0.4;
+    if (counterAttackSoundElement) counterAttackSoundElement.volume = 0.4;
+    if (weaknessHitSoundElement) weaknessHitSoundElement.volume = 0.3;
+    if (deathSoundElement) deathSoundElement.volume = 0.35;
+    
+    // Set up the audio store with all sound effects
     const audioStore = useAudio.getState();
     audioStore.setBackgroundMusic(musicElement);
     audioStore.setHitSound(hitSoundElement);
     audioStore.setSuccessSound(successSoundElement);
+    audioStore.setCriticalHitSound(criticalHitSoundElement);
+    audioStore.setCounterAttackSound(counterAttackSoundElement);
+    audioStore.setWeaknessHitSound(weaknessHitSoundElement);
+    audioStore.setDeathSound(deathSoundElement);
+    
+    console.log("Combat sound effects initialized");
   }
   
   private toggleMusic() {
