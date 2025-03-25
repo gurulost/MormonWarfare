@@ -155,6 +155,11 @@ export class GameScene extends Phaser.Scene {
     // Update minimap
     this.updateMinimap();
     
+    // Update building placement preview if active
+    if (this.buildingPlacementActive) {
+      this.updateBuildingPlacement();
+    }
+    
     // Check for game-ending conditions
     this.checkVictoryConditions();
   }
@@ -1148,6 +1153,14 @@ export class GameScene extends Phaser.Scene {
   }
   
   // Method to start building placement mode - added for 3D view interaction
+  // Building placement variables
+  private buildingPreview: Phaser.GameObjects.Container | null = null;
+  private buildingPlacementActive: boolean = false;
+  private buildingPlacementType: string = '';
+  private placementGrid: Phaser.GameObjects.Grid | null = null;
+  private validPlacementIndicator: Phaser.GameObjects.Rectangle | null = null;
+  private buildingSize: { width: number, height: number } = { width: 0, height: 0 };
+
   startBuildingPlacement(type: string): void {
     // Check if player has enough resources
     const buildingCost = this.resourceManager.getBuildingCost(type);
@@ -1156,6 +1169,7 @@ export class GameScene extends Phaser.Scene {
       buildingCost.food, 
       buildingCost.ore
     )) {
+      this.gameUI.showMessage("Not enough resources to build " + type, 2000);
       console.warn("Not enough resources to build " + type);
       return;
     }
@@ -1167,74 +1181,221 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     
-    // Need to implement the actual building placement logic
-    // This would typically involve showing a preview of the building
-    // and allowing the player to click to place it
+    // Clean up any existing placement mode
+    this.cleanupBuildingPlacement();
     
     console.log(`Starting building placement for ${type}`);
     
-    // For now, just place the building at a random valid location
-    // This should be replaced with proper UI for placement
-    let placed = false;
-    let attempts = 0;
-    const maxAttempts = 50;
+    // Set building placement as active
+    this.buildingPlacementActive = true;
+    this.buildingPlacementType = type;
     
-    while (!placed && attempts < maxAttempts) {
-      attempts++;
+    // Determine building size based on type
+    this.buildingSize = { width: 1, height: 1 }; // Default size
+    if (type === "cityCenter") {
+      this.buildingSize = { width: 2, height: 2 };
+    } else if (type === "barracks" || type === "archeryRange") {
+      this.buildingSize = { width: 2, height: 2 };
+    }
+    
+    // Create grid overlay for building placement
+    this.placementGrid = this.add.grid(
+      0, 0, // Position will be updated in update loop
+      this.map.length * TILE_SIZE, this.map[0].length * TILE_SIZE, // Size of the grid
+      TILE_SIZE, TILE_SIZE, // Cell size
+      0x000000, 0, // Fill color (transparent)
+      0xffffff, 0.2 // Stroke color and alpha
+    );
+    this.placementGrid.setDepth(100); // Ensure grid is drawn above other elements
+    
+    // Create placement validity indicator
+    this.validPlacementIndicator = this.add.rectangle(
+      0, 0, // Position will be updated in update loop
+      this.buildingSize.width * TILE_SIZE, this.buildingSize.height * TILE_SIZE,
+      0x00ff00, 0.3 // Green for valid placement
+    );
+    this.validPlacementIndicator.setDepth(99); // Below grid but above other elements
+    
+    // Create building preview
+    this.buildingPreview = this.add.container(0, 0);
+    this.buildingPreview.setDepth(101); // Above everything
+    
+    // Add building shape based on type and faction
+    const colorMain = playerData.faction === "Nephites" ? 0x2244cc : 0xcc3300;
+    const shape = this.add.rectangle(
+      0, 0,
+      this.buildingSize.width * TILE_SIZE, this.buildingSize.height * TILE_SIZE,
+      colorMain, 0.5
+    );
+    
+    // Add label
+    const label = this.add.text(0, 0, type, {
+      fontFamily: 'monospace',
+      fontSize: '12px',
+      color: '#ffffff'
+    }).setOrigin(0.5);
+    
+    this.buildingPreview.add(shape);
+    this.buildingPreview.add(label);
+    
+    // Show building cost
+    this.gameUI.showMessage(`Click to place ${type} (Cost: ${buildingCost.food} food, ${buildingCost.ore} ore)`, 3000);
+    
+    // Add click handler for placement
+    this.input.on('pointerdown', this.handleBuildingPlacement, this);
+    
+    // Add escape key to cancel placement
+    if (this.input.keyboard) {
+      this.input.keyboard.once('keydown-ESC', this.cancelBuildingPlacement, this);
+    }
+  }
+  
+  // Update method addition for building placement preview
+  private updateBuildingPlacement() {
+    if (!this.buildingPlacementActive || !this.buildingPreview || !this.validPlacementIndicator || !this.placementGrid) {
+      return;
+    }
+    
+    // Get mouse position in world coordinates
+    const pointer = this.input.activePointer;
+    const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+    
+    // Convert to tile coordinates
+    const tileX = Math.floor(worldPoint.x / TILE_SIZE);
+    const tileY = Math.floor(worldPoint.y / TILE_SIZE);
+    
+    // Position the grid overlay
+    this.placementGrid.setPosition(0, 0);
+    
+    // Position the placement indicator at the tile
+    this.validPlacementIndicator.setPosition(
+      tileX * TILE_SIZE + (this.buildingSize.width * TILE_SIZE) / 2,
+      tileY * TILE_SIZE + (this.buildingSize.height * TILE_SIZE) / 2
+    );
+    
+    // Position the building preview
+    this.buildingPreview.setPosition(
+      tileX * TILE_SIZE + (this.buildingSize.width * TILE_SIZE) / 2,
+      tileY * TILE_SIZE + (this.buildingSize.height * TILE_SIZE) / 2
+    );
+    
+    // Check if placement is valid
+    const isValid = this.isValidBuildingPlacement(tileX, tileY);
+    
+    // Update indicator color
+    this.validPlacementIndicator.fillColor = isValid ? 0x00ff00 : 0xff0000;
+    this.validPlacementIndicator.alpha = isValid ? 0.3 : 0.5;
+  }
+  
+  // Handle building placement based on mouse position
+  private handleBuildingPlacement(pointer: Phaser.Input.Pointer): void {
+    if (!this.buildingPlacementActive || !this.buildingPreview) return;
+    
+    // Get tile coordinates from pointer position
+    const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+    const tileX = Math.floor(worldPoint.x / TILE_SIZE);
+    const tileY = Math.floor(worldPoint.y / TILE_SIZE);
+    
+    if (this.isValidBuildingPlacement(tileX, tileY)) {
+      // Get player faction
+      const playerData = this.players.find(p => p.id === this.localPlayerId);
+      if (!playerData) return;
       
-      // Get a random position near the player's existing buildings
-      const playerBuildings = this.buildingManager.getBuildingsByPlayer(this.localPlayerId);
-      let x = 0;
-      let y = 0;
+      // Create the building
+      const building = this.buildingManager.createBuilding(
+        this.localPlayerId,
+        this.buildingPlacementType as any,
+        tileX,
+        tileY,
+        playerData.faction as any
+      );
       
-      if (playerBuildings.length > 0) {
-        // Use an existing building as a reference point
-        const referenceBuilding = playerBuildings[0];
-        x = referenceBuilding.x + Math.floor(Math.random() * 10) - 5;
-        y = referenceBuilding.y + Math.floor(Math.random() * 10) - 5;
-      } else {
-        // If no buildings, use a unit as reference
-        const playerUnits = this.unitManager.getUnitsByPlayer(this.localPlayerId);
-        if (playerUnits.length > 0) {
-          const referenceUnit = playerUnits[0];
-          x = referenceUnit.x + Math.floor(Math.random() * 5) - 2;
-          y = referenceUnit.y + Math.floor(Math.random() * 5) - 2;
-        } else {
-          // If no units either, use a random position
-          x = Math.floor(Math.random() * this.map.length);
-          y = Math.floor(Math.random() * this.map[0].length);
-        }
-      }
-      
-      // Make sure coordinates are valid
-      x = Math.max(0, Math.min(x, this.map.length - 1));
-      y = Math.max(0, Math.min(y, this.map[0].length - 1));
-      
-      // Check if the location is valid for building
-      if (this.map[y][x].walkable && !this.map[y][x].resource) {
-        // Create the building
-        const building = this.buildingManager.createBuilding(
-          this.localPlayerId,
-          type as any, // Type assertion because TypeScript doesn't know our specific types
-          x,
-          y,
-          playerData.faction as any // Type assertion to handle potential type mismatch
-        );
+      if (building) {
+        // Deduct resources
+        const buildingCost = this.resourceManager.getBuildingCost(this.buildingPlacementType);
+        this.resourceManager.removeResource(this.localPlayerId, "food", buildingCost.food);
+        this.resourceManager.removeResource(this.localPlayerId, "ore", buildingCost.ore);
         
-        if (building) {
-          // Deduct resources
-          this.resourceManager.removeResource(this.localPlayerId, "food", buildingCost.food);
-          this.resourceManager.removeResource(this.localPlayerId, "ore", buildingCost.ore);
-          placed = true;
+        console.log(`Building ${this.buildingPlacementType} placed at ${tileX},${tileY}`);
+        this.gameUI.showMessage(`${this.buildingPlacementType} constructed!`, 2000);
+        
+        // Clean up placement mode
+        this.cleanupBuildingPlacement();
+      }
+    } else {
+      // Show error message
+      this.gameUI.showMessage("Invalid placement location", 2000);
+    }
+  }
+  
+  // Check if building placement is valid at given coordinates
+  private isValidBuildingPlacement(tileX: number, tileY: number): boolean {
+    // Check map bounds
+    if (tileX < 0 || tileX + this.buildingSize.width > this.map.length ||
+        tileY < 0 || tileY + this.buildingSize.height > this.map[0].length) {
+      return false;
+    }
+    
+    // Check all tiles in the building's footprint
+    for (let y = tileY; y < tileY + this.buildingSize.height; y++) {
+      for (let x = tileX; x < tileX + this.buildingSize.width; x++) {
+        // Skip if out of bounds
+        if (x >= this.map.length || y >= this.map[0].length) continue;
+        
+        // Check if tile is walkable and has no resource
+        if (!this.map[y][x].walkable || this.map[y][x].resource) {
+          return false;
+        }
+        
+        // Check for other buildings or units
+        const buildings = this.buildingManager.getAllBuildings();
+        for (const building of buildings) {
+          const buildingTileX = Math.floor(building.x / TILE_SIZE);
+          const buildingTileY = Math.floor(building.y / TILE_SIZE);
           
-          console.log(`Building ${type} placed at ${x},${y}`);
+          // Simplified collision check (could be improved with actual building sizes)
+          if (Math.abs(buildingTileX - x) < 1 && Math.abs(buildingTileY - y) < 1) {
+            return false;
+          }
         }
       }
     }
     
-    if (!placed) {
-      console.warn(`Could not find a valid location to place ${type} after ${maxAttempts} attempts`);
+    return true;
+  }
+  
+  // Cancel building placement
+  private cancelBuildingPlacement(): void {
+    if (this.buildingPlacementActive) {
+      this.gameUI.showMessage("Building placement canceled", 2000);
+      this.cleanupBuildingPlacement();
     }
+  }
+  
+  // Clean up building placement mode
+  private cleanupBuildingPlacement(): void {
+    // Remove event listeners
+    this.input.off('pointerdown', this.handleBuildingPlacement, this);
+    
+    // Destroy visual elements
+    if (this.buildingPreview) {
+      this.buildingPreview.destroy();
+      this.buildingPreview = null;
+    }
+    
+    if (this.placementGrid) {
+      this.placementGrid.destroy();
+      this.placementGrid = null;
+    }
+    
+    if (this.validPlacementIndicator) {
+      this.validPlacementIndicator.destroy();
+      this.validPlacementIndicator = null;
+    }
+    
+    // Reset placement state
+    this.buildingPlacementActive = false;
+    this.buildingPlacementType = '';
   }
   
   /**

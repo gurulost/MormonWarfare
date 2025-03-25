@@ -358,14 +358,84 @@ export class Unit {
     
     // Visual indication for carrying resources
     if (this.carryingResource && unitSymbol) {
+      // Change the symbol to indicate carrying resource
       unitSymbol.setText(this.carryingResource.type === 'food' ? 'F' : 'O');
-      // Make the carried resource more visible
+      
+      // Make the carried resource more visible with enhanced styling
       if (this.carryingResource.type === 'food') {
-        unitSymbol.setStyle({ color: '#22ff22' }); // Green for food
+        unitSymbol.setStyle({ 
+          color: '#22ff22',  // Green for food
+          fontSize: '14px',  // Slightly larger
+          stroke: '#005500', // Dark green outline
+          strokeThickness: 2
+        });
+        
+        // Add a pulsing resource indicator if not already added
+        if (!this.resourceIndicator) {
+          this.resourceIndicator = scene.add.circle(0, -15, 5, 0x22ff22);
+          this.sprite.add(this.resourceIndicator);
+          
+          // Add pulsing animation
+          scene.tweens.add({
+            targets: this.resourceIndicator,
+            scaleX: { from: 0.8, to: 1.2 },
+            scaleY: { from: 0.8, to: 1.2 },
+            alpha: { from: 0.7, to: 1 },
+            duration: 800,
+            yoyo: true,
+            repeat: -1
+          });
+        }
       } else {
-        unitSymbol.setStyle({ color: '#cc9966' }); // Brown for ore
+        unitSymbol.setStyle({ 
+          color: '#cc9966',  // Brown for ore
+          fontSize: '14px',  // Slightly larger
+          stroke: '#663300', // Dark brown outline
+          strokeThickness: 2
+        });
+        
+        // Add a pulsing resource indicator if not already added
+        if (!this.resourceIndicator) {
+          this.resourceIndicator = scene.add.circle(0, -15, 5, 0xcc9966);
+          this.sprite.add(this.resourceIndicator);
+          
+          // Add pulsing animation
+          scene.tweens.add({
+            targets: this.resourceIndicator,
+            scaleX: { from: 0.8, to: 1.2 },
+            scaleY: { from: 0.8, to: 1.2 },
+            alpha: { from: 0.7, to: 1 },
+            duration: 800,
+            yoyo: true,
+            repeat: -1
+          });
+        }
+      }
+      
+      // Add text showing the amount being carried
+      if (!this.resourceAmountText && this.carryingResource.amount > 0) {
+        this.resourceAmountText = scene.add.text(15, -5, this.carryingResource.amount.toString(), {
+          fontSize: '10px',
+          color: this.carryingResource.type === 'food' ? '#22ff22' : '#cc9966',
+          stroke: '#000000',
+          strokeThickness: 1
+        });
+        this.sprite.add(this.resourceAmountText);
+      } else if (this.resourceAmountText) {
+        this.resourceAmountText.setText(this.carryingResource.amount.toString());
       }
     } else if (unitSymbol) {
+      // Remove resource visuals if no longer carrying
+      if (this.resourceIndicator) {
+        this.resourceIndicator.destroy();
+        this.resourceIndicator = null;
+      }
+      
+      if (this.resourceAmountText) {
+        this.resourceAmountText.destroy();
+        this.resourceAmountText = null;
+      }
+      
       // Reset to default text based on unit type
       if (this.type === "hero") {
         // Heroes have their own symbols (M for Moroni or A for Ammoron)
