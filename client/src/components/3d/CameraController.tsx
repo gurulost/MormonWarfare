@@ -82,6 +82,13 @@ export const CameraController: React.FC<CameraControllerProps> = ({
   const [transitionStartTime, setTransitionStartTime] = useState(0);
   const [transitionDuration, setTransitionDuration] = useState(1000); // ms
   
+  // Camera shake effect
+  const [shaking, setShaking] = useState(false);
+  const [shakeIntensity, setShakeIntensity] = useState(0);
+  const [shakeDuration, setShakeDuration] = useState(0);
+  const [shakeStartTime, setShakeStartTime] = useState(0);
+  const [originalCameraPosition, setOriginalCameraPosition] = useState<THREE.Vector3 | null>(null);
+  
   // Apply camera preset based on view mode
   useEffect(() => {
     if (!controlsRef.current) return;
@@ -162,6 +169,86 @@ export const CameraController: React.FC<CameraControllerProps> = ({
     }
   };
   
+  /**
+   * Start a camera shake effect
+   * @param intensity How strong the shake is (0.1 to 1.0 recommended)
+   * @param duration How long the shake lasts in milliseconds
+   * @param hitType Optional: Type of hit to adjust shake characteristics
+   */
+  const startCameraShake = (
+    intensity: number = 0.3, 
+    duration: number = 300, 
+    hitType: 'normal' | 'critical' | 'counter' | 'weak' | 'death' = 'normal'
+  ) => {
+    // Don't start a new shake if we're already shaking with higher intensity
+    if (shaking && intensity <= shakeIntensity) return;
+    
+    // Adjust intensity based on hit type
+    let adjustedIntensity = intensity;
+    if (hitType === 'critical') {
+      adjustedIntensity *= 1.5; // More intense for critical hits
+      duration *= 1.2;  // Longer duration
+    } else if (hitType === 'counter') {
+      adjustedIntensity *= 1.2; // Slightly more intense
+      duration *= 1.1;  // Slightly longer
+    } else if (hitType === 'weak') {
+      adjustedIntensity *= 0.8; // Less intense
+    } else if (hitType === 'death') {
+      adjustedIntensity *= 1.8; // Most intense for deaths
+      duration *= 1.5;  // Longest duration
+    }
+    
+    // Save original camera position if not already shaking
+    if (!shaking) {
+      setOriginalCameraPosition(camera.position.clone());
+    }
+    
+    // Set shake parameters
+    setShaking(true);
+    setShakeIntensity(adjustedIntensity);
+    setShakeDuration(duration);
+    setShakeStartTime(Date.now());
+    
+    // Log for debugging
+    console.log(`Camera shake started: ${hitType}, intensity: ${adjustedIntensity}, duration: ${duration}ms`);
+  };
+  
+  /**
+   * Apply camera shake in the animation frame
+   */
+  const updateCameraShake = (time: number) => {
+    if (!shaking || !originalCameraPosition) return;
+    
+    const elapsedTime = time - shakeStartTime;
+    
+    // Check if shake should end
+    if (elapsedTime >= shakeDuration) {
+      // Return to original position
+      camera.position.copy(originalCameraPosition);
+      
+      // Reset shake state
+      setShaking(false);
+      setOriginalCameraPosition(null);
+      return;
+    }
+    
+    // Calculate remaining shake strength (decreases over time)
+    const progress = elapsedTime / shakeDuration;
+    const remainingIntensity = shakeIntensity * (1 - progress);
+    
+    // Apply random offsets to camera position
+    const offsetX = (Math.random() * 2 - 1) * remainingIntensity;
+    const offsetY = (Math.random() * 2 - 1) * remainingIntensity;
+    const offsetZ = (Math.random() * 2 - 1) * remainingIntensity;
+    
+    // Apply to camera position, keeping original position as the base
+    camera.position.set(
+      originalCameraPosition.x + offsetX,
+      originalCameraPosition.y + offsetY,
+      originalCameraPosition.z + offsetZ
+    );
+  };
+  
   // Expose camera control methods to other components via window object
   useEffect(() => {
     const cameraControls = {
@@ -221,6 +308,10 @@ export const CameraController: React.FC<CameraControllerProps> = ({
           
           animateTarget();
         }
+      },
+      // Add the camera shake functionality to the exposed controls
+      shakeCamera: (intensity: number, duration: number, hitType?: 'normal' | 'critical' | 'counter' | 'weak' | 'death') => {
+        startCameraShake(intensity, duration, hitType || 'normal');
       }
     };
     
@@ -231,20 +322,32 @@ export const CameraController: React.FC<CameraControllerProps> = ({
       // Clean up when component unmounts
       delete (window as any).cameraControls;
     };
-  }, [isRotating, mapSize]);
+  }, [isRotating, mapSize, camera, shaking, shakeIntensity, originalCameraPosition]);
   
-  // Handle rotating camera animation
+  // Handle rotating camera animation and effects
   useFrame((state, delta) => {
     // Skip rendering during React transitions for performance
     if (isTransitioning) return;
     
+    const now = Date.now();
+    
     // Update any camera transition
     if (isTransitioningCamera) {
-      updateCameraTransition(Date.now());
+      updateCameraTransition(now);
     }
     
-    // Handle automatic rotation mode
-    if (isRotating && controlsRef.current) {
+    // Update camera shake effect if active
+    // We prioritize shake over rotation for visual clarity
+    if (shaking) {
+      updateCameraShake(now);
+      
+      // Update controls to ensure they follow the shaking camera
+      if (controlsRef.current) {
+        controlsRef.current.update();
+      }
+    } 
+    // Handle automatic rotation mode if no shake is happening
+    else if (isRotating && controlsRef.current) {
       const controls = controlsRef.current;
       
       // Update rotation angle

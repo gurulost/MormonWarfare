@@ -218,8 +218,32 @@ export class CombatManager {
             }
           }
           
-          // Add small camera shake on critical hits or hero attacks
-          if (hitType === 'critical' || attackerType === 'hero') {
+          // Add enhanced camera shake effect with different intensities based on hit type
+          // Use the new 3D camera shake if available (through window.cameraControls)
+          const cameraControls = (window as any).cameraControls;
+          if (cameraControls && cameraControls.shakeCamera) {
+            // Base shake intensity
+            let intensity = 0.2;
+            let duration = 200;
+            
+            // Adjust based on hit type and unit type for more dynamic feedback
+            if (hitType === 'critical') {
+              intensity = 0.4;
+              duration = 300;
+            } else if (hitType === 'counter') {
+              intensity = 0.3;
+              duration = 250;
+            } else if (attackerType === 'hero') {
+              intensity = 0.5;
+              duration = 350;
+            }
+            
+            // Trigger camera shake with appropriate parameters
+            cameraControls.shakeCamera(intensity, duration, hitType);
+            console.log(`Combat triggered camera shake: ${hitType}, intensity: ${intensity}`);
+          } 
+          // Fall back to Phaser's 2D camera shake if 3D camera controls aren't available
+          else if (hitType === 'critical' || attackerType === 'hero') {
             this.scene.cameras.main.shake(100, 0.003);
           }
         } else {
