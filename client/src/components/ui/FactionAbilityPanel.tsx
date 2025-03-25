@@ -7,136 +7,161 @@ interface FactionAbilityPanelProps {
 }
 
 export const FactionAbilityPanel: React.FC<FactionAbilityPanelProps> = ({ localPlayerId }) => {
-  const { 
-    currentFaction, 
-    abilities, 
-    activateAbility 
+  const {
+    currentFaction,
+    abilities,
+    activateAbility,
+    updateCooldowns
   } = useFactionAbilities();
   
-  const [abilityActivationMessages, setAbilityActivationMessages] = useState<string[]>([]);
+  const [lastUpdateTime, setLastUpdateTime] = useState(Date.now());
   
-  // Handle ability activation feedback
+  // Update cooldowns every frame
   useEffect(() => {
-    const handleAbilityActivated = (event: CustomEvent) => {
-      const { abilityName } = event.detail;
+    let animationFrameId: number;
+    
+    const updateFrame = () => {
+      const now = Date.now();
+      const deltaMs = now - lastUpdateTime;
       
-      // Add new message
-      setAbilityActivationMessages(prev => [
-        `${abilityName} activated!`,
-        ...prev.slice(0, 2) // Only keep the last 3 messages
-      ]);
+      updateCooldowns(deltaMs);
+      setLastUpdateTime(now);
       
-      // Remove message after 3 seconds
-      setTimeout(() => {
-        setAbilityActivationMessages(prev => prev.slice(0, -1));
-      }, 3000);
+      animationFrameId = requestAnimationFrame(updateFrame);
     };
     
-    // Listen for ability activation events
+    animationFrameId = requestAnimationFrame(updateFrame);
+    
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [updateCooldowns, lastUpdateTime]);
+  
+  // Listen for ability activation events
+  useEffect(() => {
+    const handleAbilityActivated = (event: CustomEvent) => {
+      const { abilityId, abilityName } = event.detail;
+      
+      // Create a floating notification
+      const notification = document.createElement('div');
+      notification.className = `ability-notification ${currentFaction?.toLowerCase()}`;
+      notification.textContent = `${abilityName} activated!`;
+      document.body.appendChild(notification);
+      
+      // Animate and remove
+      setTimeout(() => {
+        notification.style.opacity = '0';
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 500);
+      }, 2000);
+    };
+    
+    // Add event listener
     document.addEventListener('abilityActivated', handleAbilityActivated as EventListener);
     
     return () => {
       document.removeEventListener('abilityActivated', handleAbilityActivated as EventListener);
     };
-  }, []);
+  }, [currentFaction]);
   
-  // Don't render if no faction set
+  // If no faction or abilities, don't render
   if (!currentFaction || abilities.length === 0) {
     return null;
   }
-
-  // Only show unlocked abilities
-  const unlockedAbilities = abilities.filter(ability => ability.unlocked);
   
-  // Don't render if no abilities unlocked yet
-  if (unlockedAbilities.length === 0) {
-    return null;
-  }
+  // Get only the unlocked abilities
+  const availableAbilities = abilities.filter(ability => 
+    ability.unlocked || process.env.NODE_ENV === 'development' // Show all in dev mode
+  );
   
   return (
-    <div className="faction-ability-panel">
-      <div className="faction-abilities-header">
-        <h3>{currentFaction} Abilities</h3>
-      </div>
-      
-      <div className="faction-abilities-list">
-        {unlockedAbilities.map(ability => (
-          <AbilityButton 
-            key={ability.id}
-            ability={ability}
-            onClick={() => activateAbility(ability.id)}
-          />
-        ))}
-      </div>
-      
-      {/* Ability activation messages */}
-      <div className="ability-messages">
-        {abilityActivationMessages.map((message, index) => (
-          <div key={index} className="ability-message">
-            {message}
-          </div>
-        ))}
-      </div>
+    <div className="faction-abilities-container">
+      {availableAbilities.map(ability => (
+        <AbilityButton 
+          key={ability.id}
+          ability={ability}
+          faction={currentFaction}
+          onClick={() => activateAbility(ability.id)}
+        />
+      ))}
     </div>
   );
 };
 
 interface AbilityButtonProps {
   ability: AbilityState;
+  faction: string;
   onClick: () => void;
 }
 
-const AbilityButton: React.FC<AbilityButtonProps> = ({ ability, onClick }) => {
-  // Format time as MM:SS
-  const formatTime = (timeMs: number) => {
-    const totalSeconds = Math.ceil(timeMs / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
+const AbilityButton: React.FC<AbilityButtonProps> = ({ ability, faction, onClick }) => {
+  const factionClass = faction.toLowerCase();
   
-  // Calculate cooldown percentage for visual indicator
-  const cooldownPercent = Math.min(100, Math.max(0, 
-    ability.inCooldown 
-      ? (ability.cooldownRemaining / ability.cooldown) * 100
-      : 0
-  ));
+  // Calculate cooldown progress (0-100%)
+  const cooldownProgress = ability.inCooldown 
+    ? (1 - ability.cooldownRemaining / ability.cooldown) * 100 
+    : 100;
   
-  // Calculate duration percentage for visual indicator
-  const durationPercent = Math.min(100, Math.max(0,
-    ability.isActive && ability.durationRemaining && ability.duration
-      ? (ability.durationRemaining / ability.duration) * 100
-      : 0
-  ));
-  
-  // Determine button state styling
-  const getButtonClass = () => {
-    if (ability.isActive) return 'active';
-    if (ability.inCooldown) return 'cooldown';
-    return 'ready';
+  // Format cooldown time remaining
+  const formatCooldown = (ms: number): string => {
+    if (ms <= 0) return 'Ready';
+    const seconds = Math.ceil(ms / 1000);
+    return `${seconds}s`;
   };
   
   return (
-    <div className={`ability-button ${getButtonClass()}`}>
-      <button 
-        onClick={onClick}
-        disabled={ability.inCooldown || ability.isActive}
-        title={ability.description}
-      >
-        {ability.name}
-        
-        {/* Cooldown overlay */}
-        {ability.inCooldown && (
-          <div className="cooldown-overlay" style={{ height: `${cooldownPercent}%` }}>
-            <span className="cooldown-time">{formatTime(ability.cooldownRemaining)}</span>
+    <button
+      className={`ability-button ${factionClass}`}
+      onClick={onClick}
+      disabled={ability.inCooldown || !ability.unlocked}
+    >
+      {/* Ability icon */}
+      <div className="ability-icon">{ability.icon}</div>
+      
+      {/* Ability name */}
+      <div className="ability-name">{ability.name}</div>
+      
+      {/* Cooldown overlay */}
+      {ability.inCooldown && (
+        <div className="ability-overlay">
+          {formatCooldown(ability.cooldownRemaining)}
+        </div>
+      )}
+      
+      {/* Active effect indicator */}
+      {ability.isActive && (
+        <div className={`ability-effect active-${factionClass}`}></div>
+      )}
+      
+      {/* Cooldown progress bar */}
+      <div 
+        className={`ability-cooldown ${factionClass}`}
+        style={{ width: `${cooldownProgress}%` }}
+      ></div>
+      
+      {/* Tooltip with additional information */}
+      <div className={`ability-tooltip ${factionClass}`}>
+        <div className="tooltip-title">{ability.name}</div>
+        <div className="tooltip-description">{ability.description}</div>
+        {ability.effectDescription && (
+          <div className="tooltip-lore">{ability.effectDescription}</div>
+        )}
+        <div className="tooltip-stats">
+          <div className="tooltip-stat">
+            <span>Cooldown</span>
+            <span className="tooltip-stat-value">{ability.cooldown / 1000}s</span>
           </div>
-        )}
-        
-        {/* Duration indicator */}
-        {ability.isActive && ability.durationRemaining && (
-          <div className="duration-indicator" style={{ width: `${durationPercent}%` }}></div>
-        )}
-      </button>
-    </div>
+          {ability.duration && (
+            <div className="tooltip-stat">
+              <span>Duration</span>
+              <span className="tooltip-stat-value">{ability.duration / 1000}s</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </button>
   );
 };
+
+export default FactionAbilityPanel;

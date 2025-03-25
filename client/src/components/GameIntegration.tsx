@@ -3,6 +3,8 @@ import { GameHUD } from "@/components/ui/gameHUD";
 import { useGame } from "@/lib/stores/useGame";
 import { useMultiplayer } from "@/lib/stores/useMultiplayer";
 import GameOverlay from "@/components/3d/GameOverlay";
+import FactionAbilityPanel from "@/components/ui/FactionAbilityPanel";
+import { useFactionAbilities } from "@/lib/stores/useFactionAbilities";
 
 interface GameIntegrationProps {
   gameInstance?: Phaser.Game;
@@ -12,6 +14,7 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
   // Game state
   const gamePhase = useGame(state => state.phase);
   const multiplayer = useMultiplayer();
+  const setFaction = useFactionAbilities(state => state.setFaction);
   
   // Game data state
   const [resources, setResources] = useState({ food: 0, ore: 0 });

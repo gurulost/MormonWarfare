@@ -14,6 +14,10 @@ export interface AbilityState {
   isActive: boolean;
   inCooldown: boolean;
   unlocked: boolean;
+  icon: string; // Icon to display for the ability (emoji or character)
+  unitType?: string; // The unit type this ability is associated with
+  effectDescription?: string; // Detailed description of what the ability does
+  color: string; // Color to use for visual indication
 }
 
 interface FactionAbilityState {
@@ -43,19 +47,95 @@ export const useFactionAbilities = create<FactionAbilityState>((set, get) => ({
     // Convert config abilities to state
     const newAbilities: AbilityState[] = [];
     
-    Object.entries(factionConfig.abilities).forEach(([id, ability]) => {
+    // Define faction-specific abilities
+    if (faction === 'Nephites') {
       newAbilities.push({
-        id,
-        name: ability.name,
-        description: ability.description,
-        cooldown: ability.cooldown,
-        duration: ability.duration || undefined,
+        id: 'faithShield',
+        name: 'Faith Shield',
+        description: 'Activate a protective shield of faith that reduces damage taken by 50% for 5 seconds',
+        effectDescription: 'The Stripling Warriors were known for their faith, which protected them in battle.',
+        cooldown: 30000, // 30 seconds
+        duration: 5000, // 5 seconds
         cooldownRemaining: 0,
         durationRemaining: 0,
         isActive: false,
         inCooldown: false,
-        unlocked: false // Initially locked, unlocked through tech tree
+        unlocked: true, // Available immediately for Nephites
+        icon: '🛡️',
+        unitType: 'striplingWarrior',
+        color: '#3366cc'
       });
+      
+      newAbilities.push({
+        id: 'titleOfLiberty',
+        name: 'Title of Liberty',
+        description: 'Rally nearby units, increasing their attack by 25% for 10 seconds',
+        effectDescription: 'Captain Moroni\'s Title of Liberty inspired the Nephites to fight for their freedom.',
+        cooldown: 60000, // 60 seconds
+        duration: 10000, // 10 seconds
+        cooldownRemaining: 0,
+        durationRemaining: 0,
+        isActive: false,
+        inCooldown: false,
+        unlocked: false, // Needs to be researched
+        icon: '🏳️',
+        color: '#3366cc'
+      });
+    } 
+    else if (faction === 'Lamanites') {
+      newAbilities.push({
+        id: 'stealth',
+        name: 'Stealth',
+        description: 'Make Lamanite Scout units invisible to enemies until they attack',
+        effectDescription: 'Lamanite scouts were masters of stealth, able to move undetected through Nephite territory.',
+        cooldown: 20000, // 20 seconds
+        duration: 15000, // 15 seconds
+        cooldownRemaining: 0,
+        durationRemaining: 0,
+        isActive: false,
+        inCooldown: false,
+        unlocked: true, // Available immediately for Lamanites
+        icon: '👁️',
+        unitType: 'lamaniteScout',
+        color: '#cc3300'
+      });
+      
+      newAbilities.push({
+        id: 'warCry',
+        name: 'War Cry',
+        description: 'Intimidate enemies, reducing their defense by 20% for 8 seconds',
+        effectDescription: 'The fearsome war cries of Lamanite warriors struck fear into their enemies.',
+        cooldown: 45000, // 45 seconds
+        duration: 8000, // 8 seconds
+        cooldownRemaining: 0,
+        durationRemaining: 0,
+        isActive: false,
+        inCooldown: false,
+        unlocked: false, // Needs to be researched
+        icon: '📣',
+        color: '#cc3300'
+      });
+    }
+    
+    // Also add any abilities from the config (for backward compatibility)
+    Object.entries(factionConfig.abilities || {}).forEach(([id, ability]) => {
+      // Check if ability already exists
+      if (!newAbilities.some(a => a.id === id)) {
+        newAbilities.push({
+          id,
+          name: ability.name,
+          description: ability.description,
+          cooldown: ability.cooldown,
+          duration: ability.duration || undefined,
+          cooldownRemaining: 0,
+          durationRemaining: 0,
+          isActive: false,
+          inCooldown: false,
+          unlocked: false, // Initially locked, unlocked through tech tree
+          icon: '✨', // Default icon
+          color: faction === 'Nephites' ? '#3366cc' : '#cc3300'
+        });
+      }
     });
     
     set({
