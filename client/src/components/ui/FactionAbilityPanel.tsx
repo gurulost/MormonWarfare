@@ -40,30 +40,50 @@ export const FactionAbilityPanel: React.FC<FactionAbilityPanelProps> = ({ localP
   // Listen for ability activation events
   useEffect(() => {
     const handleAbilityActivated = (event: CustomEvent) => {
-      const { abilityId, abilityName } = event.detail;
+      const { abilityId, success } = event.detail;
       
-      // Create a floating notification
-      const notification = document.createElement('div');
-      notification.className = `ability-notification ${currentFaction?.toLowerCase()}`;
-      notification.textContent = `${abilityName} activated!`;
-      document.body.appendChild(notification);
+      // Find the ability that was activated
+      const ability = abilities.find(a => a.id === abilityId);
+      if (!ability) return;
       
-      // Animate and remove
-      setTimeout(() => {
-        notification.style.opacity = '0';
+      if (success) {
+        // Create a floating notification
+        const notification = document.createElement('div');
+        notification.className = `ability-notification ${currentFaction?.toLowerCase()}`;
+        notification.textContent = `${ability.name} activated!`;
+        document.body.appendChild(notification);
+        
+        // Animate and remove
         setTimeout(() => {
-          document.body.removeChild(notification);
-        }, 500);
-      }, 2000);
+          notification.style.opacity = '0';
+          setTimeout(() => {
+            document.body.removeChild(notification);
+          }, 500);
+        }, 2000);
+      } else {
+        // Create a failure notification
+        const notification = document.createElement('div');
+        notification.className = `ability-notification ability-failed`;
+        notification.textContent = `${ability.name} failed! Select appropriate units.`;
+        document.body.appendChild(notification);
+        
+        // Animate and remove
+        setTimeout(() => {
+          notification.style.opacity = '0';
+          setTimeout(() => {
+            document.body.removeChild(notification);
+          }, 500);
+        }, 2000);
+      }
     };
     
     // Add event listener
-    document.addEventListener('abilityActivated', handleAbilityActivated as EventListener);
+    window.addEventListener('ability-activated', handleAbilityActivated as EventListener);
     
     return () => {
-      document.removeEventListener('abilityActivated', handleAbilityActivated as EventListener);
+      window.removeEventListener('ability-activated', handleAbilityActivated as EventListener);
     };
-  }, [currentFaction]);
+  }, [currentFaction, abilities]);
   
   // If no faction or abilities, don't render
   if (!currentFaction || abilities.length === 0) {
@@ -110,10 +130,27 @@ const AbilityButton: React.FC<AbilityButtonProps> = ({ ability, faction, onClick
     return `${seconds}s`;
   };
   
+  // Function to handle button click
+  const handleClick = () => {
+    // If ability is in cooldown or not unlocked, do nothing
+    if (ability.inCooldown || !ability.unlocked) {
+      return;
+    }
+    
+    // Call the onClick handler (activateAbility)
+    onClick();
+    
+    // Dispatch the custom event to trigger ability activation in game
+    const event = new CustomEvent('activate-ability', {
+      detail: { abilityId: ability.id }
+    });
+    window.dispatchEvent(event);
+  };
+  
   return (
     <button
       className={`ability-button ${factionClass}`}
-      onClick={onClick}
+      onClick={handleClick}
       disabled={ability.inCooldown || !ability.unlocked}
     >
       {/* Ability icon */}
