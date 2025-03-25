@@ -30,6 +30,8 @@ export class Unit {
   targetUnitId: string | null;
   carryingResource: { type: 'food' | 'ore', amount: number } | null;
   gatheringEfficiency: number; // Faction-specific bonus
+  resourceIndicator: Phaser.GameObjects.Shape | null = null;
+  resourceAmountText: Phaser.GameObjects.Text | null = null;
   
   // Client-side prediction properties
   isPredicted: boolean = false;
@@ -372,11 +374,12 @@ export class Unit {
         
         // Add a pulsing resource indicator if not already added
         if (!this.resourceIndicator) {
-          this.resourceIndicator = scene.add.circle(0, -15, 5, 0x22ff22);
+          const currentScene = this.sprite.scene;
+          this.resourceIndicator = currentScene.add.circle(0, -15, 5, 0x22ff22);
           this.sprite.add(this.resourceIndicator);
           
           // Add pulsing animation
-          scene.tweens.add({
+          currentScene.tweens.add({
             targets: this.resourceIndicator,
             scaleX: { from: 0.8, to: 1.2 },
             scaleY: { from: 0.8, to: 1.2 },
@@ -396,11 +399,12 @@ export class Unit {
         
         // Add a pulsing resource indicator if not already added
         if (!this.resourceIndicator) {
-          this.resourceIndicator = scene.add.circle(0, -15, 5, 0xcc9966);
+          const currentScene = this.sprite.scene;
+          this.resourceIndicator = currentScene.add.circle(0, -15, 5, 0xcc9966);
           this.sprite.add(this.resourceIndicator);
           
           // Add pulsing animation
-          scene.tweens.add({
+          currentScene.tweens.add({
             targets: this.resourceIndicator,
             scaleX: { from: 0.8, to: 1.2 },
             scaleY: { from: 0.8, to: 1.2 },
@@ -414,7 +418,8 @@ export class Unit {
       
       // Add text showing the amount being carried
       if (!this.resourceAmountText && this.carryingResource.amount > 0) {
-        this.resourceAmountText = scene.add.text(15, -5, this.carryingResource.amount.toString(), {
+        const currentScene = this.sprite.scene;
+        this.resourceAmountText = currentScene.add.text(15, -5, this.carryingResource.amount.toString(), {
           fontSize: '10px',
           color: this.carryingResource.type === 'food' ? '#22ff22' : '#cc9966',
           stroke: '#000000',

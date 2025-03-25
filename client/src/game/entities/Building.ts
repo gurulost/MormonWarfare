@@ -21,6 +21,11 @@ export class Building {
   productionQueue: { type: string; remainingTime: number }[];
   size: number;
   
+  // Production UI elements
+  productionBar: Phaser.GameObjects.Rectangle | null = null;
+  productionBarBg: Phaser.GameObjects.Rectangle | null = null;
+  queueIndicators: Phaser.GameObjects.Container | null = null;
+  
   constructor(
     scene: Phaser.Scene,
     id: string,
@@ -179,6 +184,125 @@ export class Building {
     return stats;
   }
   
+  /**
+   * Creates or updates the production UI elements
+   */
+  private updateProductionUI() {
+    const scene = this.sprite.scene;
+    
+    // Create production bar if it doesn't exist yet but building can produce
+    if (this.canProduce() && !this.productionBar) {
+      // Position below the health bar
+      this.productionBarBg = scene.add.rectangle(
+        0, -this.size * 10 + 5, 
+        this.size * 20, 6, 
+        0x333333
+      );
+      
+      this.productionBar = scene.add.rectangle(
+        -this.size * 10, -this.size * 10 + 5, 
+        0, 6, 
+        0x00aaff
+      ).setOrigin(0, 0);
+      
+      this.sprite.add([this.productionBarBg, this.productionBar]);
+      
+      // Create queue indicators container
+      this.queueIndicators = scene.add.container(0, 0);
+      this.sprite.add(this.queueIndicators);
+    }
+    
+    // Update production bar if it exists
+    if (this.productionBar && this.isProducing) {
+      this.productionBar.width = this.size * 20 * this.productionProgress;
+      this.productionBar.setVisible(true);
+      if (this.productionBarBg) this.productionBarBg.setVisible(true);
+    } else if (this.productionBar) {
+      this.productionBar.setVisible(false);
+      if (this.productionBarBg) this.productionBarBg.setVisible(false);
+    }
+    
+    // Update queue indicators
+    this.updateQueueIndicators();
+  }
+  
+  /**
+   * Updates the visual representation of the production queue
+   */
+  private updateQueueIndicators() {
+    if (!this.queueIndicators) return;
+    
+    // Clear previous indicators
+    this.queueIndicators.removeAll(true);
+    
+    // Create new indicators for each item in queue (skip the active one)
+    const queueToShow = this.productionQueue.slice(1);
+    
+    // Determine indicator starting position (above the building)
+    const startY = -this.size * 12;
+    const startX = -this.size * 8;
+    
+    queueToShow.forEach((item, index) => {
+      const scene = this.sprite.scene;
+      
+      // Each item has a background and a text label
+      const bg = scene.add.circle(
+        startX + index * 16, 
+        startY, 
+        6, 
+        this.getColorForUnitType(item.type)
+      );
+      
+      const label = scene.add.text(
+        startX + index * 16,
+        startY,
+        this.getSymbolForUnitType(item.type), 
+        {
+          fontSize: '10px',
+          color: '#ffffff',
+          fontFamily: 'monospace'
+        }
+      ).setOrigin(0.5);
+      
+      this.queueIndicators.add([bg, label]);
+    });
+  }
+  
+  /**
+   * Get the appropriate color for a unit type
+   */
+  private getColorForUnitType(type: string): number {
+    switch (type) {
+      case "worker": return 0x33cc33; // Green for workers
+      case "melee": return 0xcc3333;  // Red for melee
+      case "ranged": return 0x3333cc; // Blue for ranged
+      case "hero": return 0xffcc00;   // Gold for hero
+      default: return 0xaaaaaa;       // Gray for unknown
+    }
+  }
+  
+  /**
+   * Get the symbol to display for a unit type
+   */
+  private getSymbolForUnitType(type: string): string {
+    switch (type) {
+      case "worker": return "W";
+      case "melee": return "M";  
+      case "ranged": return "R";
+      case "hero": return "H";
+      default: return "?";
+    }
+  }
+  
+  /**
+   * Check if this building can produce units
+   */
+  private canProduce(): boolean {
+    return this.type === "cityCenter" || 
+           this.type === "barracks" || 
+           this.type === "archeryRange";
+  }
+  
   update(delta: number) {
     // Update health bar
     const healthPercent = this.health / this.maxHealth;
@@ -190,6 +314,7 @@ export class Building {
     selectionRect.setVisible(this.selected);
     
     // Update production
+    let producedType = null;
     if (this.isProducing && this.productionQueue.length > 0) {
       const currentProduction = this.productionQueue[0];
       currentProduction.remainingTime -= delta;
@@ -199,7 +324,7 @@ export class Building {
       
       // Check if production completed
       if (currentProduction.remainingTime <= 0) {
-        const producedType = currentProduction.type;
+        producedType = currentProduction.type;
         this.productionQueue.shift();
         
         // If queue is empty, stop producing
@@ -208,13 +333,16 @@ export class Building {
         } else {
           // Start the next item in queue
           this.productionTime = this.getProductionTime(this.productionQueue[0].type);
+          // Reset progress for new item
+          this.productionProgress = 0;
         }
-        
-        return producedType; // Return the produced item
       }
     }
     
-    return null; // Nothing produced this update
+    // Update production UI elements
+    this.updateProductionUI();
+    
+    return producedType; // Return the produced item or null
   }
   
   setSelected(selected: boolean) {
