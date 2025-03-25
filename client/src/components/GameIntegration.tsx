@@ -14,7 +14,7 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
   // Game state
   const gamePhase = useGame(state => state.phase);
   const multiplayer = useMultiplayer();
-  const setFaction = useFactionAbilities(state => state.setFaction);
+  const { setFaction, abilities, activateAbility } = useFactionAbilities();
   
   // Game data state
   const [resources, setResources] = useState({ food: 0, ore: 0 });
@@ -112,7 +112,14 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
         const playersList = gameScene.getPlayers();
         const localPlayer = playersList.find((p: any) => p.id === gameScene.getLocalPlayerId());
         if (localPlayer) {
+          // Update faction in component state
           setPlayerFaction(localPlayer.faction);
+          
+          // Update faction in ability store if changed
+          if (localPlayer.faction && localPlayer.faction !== playerFaction) {
+            setFaction(localPlayer.faction);
+            console.log(`Updated faction abilities for ${localPlayer.faction}`);
+          }
         }
         
         // Get units and buildings
@@ -279,6 +286,97 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
     }
   }, [gameInstance]);
   
+  // Handle faction ability activation
+  useEffect(() => {
+    // Create custom event listener for ability activation
+    const handleAbilityActivation = (event: CustomEvent) => {
+      if (!gameInstance) return;
+      
+      const gameScene = gameInstance.scene.getScene("GameScene") as any;
+      if (!gameScene) return;
+      
+      const { abilityId } = event.detail;
+      console.log(`Activating ability: ${abilityId}`);
+      
+      // Find the ability data
+      const ability = abilities.find(a => a.id === abilityId);
+      if (!ability) return;
+      
+      // Apply ability effect based on faction and ability type
+      const selectedUnitIds = gameScene.getSelectedUnits();
+      
+      if (selectedUnitIds && selectedUnitIds.length > 0) {
+        // Get all selected units
+        const selectedUnits = selectedUnitIds.map(id => gameScene.unitManager.getUnit(id)).filter(Boolean);
+        
+        if (ability.id === 'faith-shield' && playerFaction === 'Nephites') {
+          // Apply faith shield to selected Stripling Warriors
+          selectedUnits.forEach(unit => {
+            if (unit.type === 'striplingWarrior') {
+              unit.hasFaithShield = true;
+              unit.usedFaithShield = false;
+              
+              // Create visual effect
+              if (gameScene.combatManager) {
+                const effectPosition = { x: unit.x, y: unit.y };
+                gameScene.combatManager.createProtectionEffect(effectPosition.x, effectPosition.y);
+              }
+            }
+          });
+          
+          // Dispatch event for successful activation
+          const abilityEvent = new CustomEvent('ability-activated', { 
+            detail: { abilityId, success: true } 
+          });
+          window.dispatchEvent(abilityEvent);
+        } 
+        else if (ability.id === 'stealth' && playerFaction === 'Lamanites') {
+          // Apply stealth to selected Lamanite scouts
+          selectedUnits.forEach(unit => {
+            if (unit.type === 'lamaniteScout') {
+              unit.isStealthed = true;
+              
+              // Create visual effect
+              if (gameScene.combatManager) {
+                const effectPosition = { x: unit.x, y: unit.y };
+                gameScene.combatManager.createStealthEffect(effectPosition.x, effectPosition.y);
+              }
+            }
+          });
+          
+          // Dispatch event for successful activation
+          const abilityEvent = new CustomEvent('ability-activated', { 
+            detail: { abilityId, success: true } 
+          });
+          window.dispatchEvent(abilityEvent);
+        }
+        else {
+          console.warn(`Ability ${ability.id} not implemented or not applicable to selected units`);
+          // Dispatch event for failed activation
+          const abilityEvent = new CustomEvent('ability-activated', { 
+            detail: { abilityId, success: false } 
+          });
+          window.dispatchEvent(abilityEvent);
+        }
+      } else {
+        console.warn('No units selected for ability activation');
+        // Dispatch event for failed activation
+        const abilityEvent = new CustomEvent('ability-activated', { 
+          detail: { abilityId, success: false } 
+        });
+        window.dispatchEvent(abilityEvent);
+      }
+    };
+    
+    // Add event listener for ability activation
+    window.addEventListener('activate-ability', handleAbilityActivation as EventListener);
+    
+    // Clean up event listener
+    return () => {
+      window.removeEventListener('activate-ability', handleAbilityActivation as EventListener);
+    };
+  }, [gameInstance, abilities, playerFaction]);
+  
   // Generate dummy game data for the 3D overlay scene
   const generateGameData = useCallback(() => {
     return {
@@ -332,6 +430,11 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
         onCameraViewChange={handleCameraViewChange}
         onMinimapClick={handleMinimapClick}
       />
+      
+      {/* Faction-specific abilities panel */}
+      {gamePhase === 'playing' && localPlayerId && (
+        <FactionAbilityPanel localPlayerId={localPlayerId} />
+      )}
       
       {/* Enhanced view mode controls */}
       <div className="fixed right-4 top-16 z-50 flex flex-col gap-2">
