@@ -115,11 +115,33 @@ export class GameUI {
     this.resourceText.setText(`Food: ${resources.food} | Ore: ${resources.ore}`);
   }
   
-  updateSelection(selectedUnitIds: string[]) {
-    // Clear previous action buttons
+  // Production queue container for displaying building production
+  private productionQueueContainer: Phaser.GameObjects.Container | null = null;
+  private selectedBuilding: any | null = null;
+  
+  updateSelection(selectedUnitIds: string[], selectedBuildingId?: string) {
+    // Clear previous action buttons and UI elements
     this.actionButtons.forEach(button => button.destroy());
     this.actionButtons = [];
     
+    // Clear production queue display if it exists
+    if (this.productionQueueContainer) {
+      this.productionQueueContainer.destroy();
+      this.productionQueueContainer = null;
+    }
+    
+    this.selectedBuilding = null;
+    
+    // First check if a building is selected
+    if (selectedBuildingId) {
+      const building = this.buildingManager.getBuilding(selectedBuildingId);
+      if (building) {
+        this.displayBuildingInfo(building);
+        return;
+      }
+    }
+    
+    // If no building is selected, process unit selection
     if (selectedUnitIds.length === 0) {
       this.selectedUnitInfo.setText("No units selected");
       return;
@@ -142,6 +164,311 @@ export class GameUI {
       this.createWorkerButtons();
     } else if (unit.type === "melee" || unit.type === "ranged") {
       this.createMilitaryButtons();
+    }
+  }
+  
+  /**
+   * Display information about a selected building and its production queue
+   */
+  private displayBuildingInfo(building: any) {
+    this.selectedBuilding = building;
+    
+    // Set building info text
+    this.selectedUnitInfo.setText(
+      `Selected: ${this.getBuildingDisplayName(building.type)}\n` +
+      `Health: ${building.health}/${building.maxHealth}\n` +
+      `Owner: ${this.getPlayerName(building.playerId)}`
+    );
+    
+    // Create buttons based on building type
+    if (building.type === "cityCenter") {
+      this.createTrainWorkerButton();
+    } else if (building.type === "barracks") {
+      this.createTrainMeleeButton();
+    } else if (building.type === "archeryRange") {
+      this.createTrainRangedButton();
+    }
+    
+    // Create production queue display
+    this.createProductionQueueDisplay(building);
+  }
+  
+  /**
+   * Get a user-friendly name for building types
+   */
+  private getBuildingDisplayName(type: string): string {
+    switch (type) {
+      case "cityCenter": return "City Center";
+      case "barracks": return "Barracks";
+      case "archeryRange": return "Archery Range";
+      case "wall": return "Wall";
+      default: return type;
+    }
+  }
+  
+  /**
+   * Get player name by ID
+   */
+  private getPlayerName(playerId: string): string {
+    const players = this.scene.registry.get("players") || [];
+    const player = players.find((p: any) => p.id === playerId);
+    return player ? player.username : "Unknown";
+  }
+  
+  /**
+   * Create a visual display of the building's production queue
+   */
+  private createProductionQueueDisplay(building: any) {
+    const { width, height } = this.scene.cameras.main;
+    
+    // Create container for production queue elements
+    this.productionQueueContainer = this.scene.add.container(width - 200, height - UI_PANEL_HEIGHT / 2)
+      .setScrollFactor(0);
+    
+    // Get production queue
+    const queue = building.getProductionQueue();
+    const progress = building.getProductionProgress();
+    
+    // Create background for production panel
+    const bg = this.scene.add.rectangle(0, 0, 180, 100, 0x333333, 0.8)
+      .setStrokeStyle(1, 0xffffff, 0.5);
+    
+    // Create title
+    const title = this.scene.add.text(0, -40, "Production Queue", {
+      fontFamily: "monospace",
+      fontSize: "12px",
+      color: "#ffffff",
+      align: "center"
+    }).setOrigin(0.5);
+    
+    this.productionQueueContainer.add([bg, title]);
+    
+    // No items in queue
+    if (queue.length === 0) {
+      const emptyText = this.scene.add.text(0, 0, "Nothing in production", {
+        fontFamily: "monospace",
+        fontSize: "10px",
+        color: "#aaaaaa",
+        align: "center"
+      }).setOrigin(0.5);
+      
+      this.productionQueueContainer.add(emptyText);
+      return;
+    }
+    
+    // Create an entry for the currently producing item with progress bar
+    const currentItem = queue[0];
+    const currentItemText = this.scene.add.text(-80, -20, this.getUnitDisplayName(currentItem.type), {
+      fontFamily: "monospace",
+      fontSize: "12px",
+      color: "#ffffff"
+    }).setOrigin(0, 0.5);
+    
+    // Progress bar background
+    const progressBarBg = this.scene.add.rectangle(0, 0, 150, 12, 0x666666);
+    
+    // Progress bar fill
+    const progressBarFill = this.scene.add.rectangle(-75, 0, 150 * progress, 12, 0x00aaff)
+      .setOrigin(0, 0.5);
+    
+    // Percentage text
+    const percentText = this.scene.add.text(75, 0, `${Math.floor(progress * 100)}%`, {
+      fontFamily: "monospace",
+      fontSize: "10px",
+      color: "#ffffff"
+    }).setOrigin(1, 0.5);
+    
+    this.productionQueueContainer.add([currentItemText, progressBarBg, progressBarFill, percentText]);
+    
+    // Add remaining queue items (limited to showing 3 for space)
+    const queueToShow = queue.slice(1, 4);
+    queueToShow.forEach((item: any, index: number) => {
+      const y = 20 + index * 20;
+      
+      // Item name
+      const itemText = this.scene.add.text(-80, y, `${index + 1}. ${this.getUnitDisplayName(item.type)}`, {
+        fontFamily: "monospace",
+        fontSize: "11px",
+        color: "#cccccc"
+      }).setOrigin(0, 0.5);
+      
+      // Cancel button
+      const cancelBtn = this.scene.add.text(70, y, "X", {
+        fontFamily: "monospace",
+        fontSize: "11px",
+        color: "#ff6666",
+        backgroundColor: "#553333",
+        padding: { x: 5, y: 2 }
+      })
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true })
+        .on("pointerdown", () => {
+          // Cancel this production item
+          if (this.selectedBuilding) {
+            this.buildingManager.cancelUnitProduction(this.selectedBuilding.id, index + 1);
+            
+            // Refresh display
+            this.displayBuildingInfo(this.selectedBuilding);
+          }
+        });
+      
+      this.productionQueueContainer.add([itemText, cancelBtn]);
+    });
+    
+    // If there are more items than shown
+    if (queue.length > 4) {
+      const moreText = this.scene.add.text(0, 80, `+${queue.length - 4} more`, {
+        fontFamily: "monospace",
+        fontSize: "10px",
+        color: "#aaaaaa"
+      }).setOrigin(0.5);
+      
+      this.productionQueueContainer.add(moreText);
+    }
+  }
+  
+  /**
+   * Get a user-friendly name for unit types
+   */
+  private getUnitDisplayName(type: string): string {
+    switch (type) {
+      case "worker": return "Worker";
+      case "melee": return "Warrior";
+      case "ranged": return "Archer";
+      case "hero": return "Hero";
+      default: return type;
+    }
+  }
+  
+  /**
+   * Create button to train worker units
+   */
+  private createTrainWorkerButton() {
+    const { width, height } = this.scene.cameras.main;
+    const buttonX = width / 2 - 50;
+    const buttonY = height - UI_PANEL_HEIGHT / 2;
+    
+    // Check if local player owns this building
+    const playerId = this.scene.registry.get("localPlayerId");
+    
+    if (this.selectedBuilding && this.selectedBuilding.playerId === playerId) {
+      // Get cost
+      const unitCost = this.resourceManager.getUnitCost("worker");
+      const cost = `(F:${unitCost.food}/O:${unitCost.ore})`;
+      
+      // Check if player has resources
+      const canAfford = this.resourceManager.hasEnoughResources(playerId, unitCost.food, unitCost.ore);
+      
+      this.createActionButton(
+        buttonX, buttonY,
+        `Train Worker ${cost}`,
+        () => {
+          if (this.selectedBuilding) {
+            // Deduct resources
+            if (this.resourceManager.deductResourcesForUnit(playerId, "worker")) {
+              // Add to production queue
+              this.buildingManager.queueUnitProduction(this.selectedBuilding.id, "worker");
+              
+              // Update resources
+              this.updateResources();
+              
+              // Refresh building info
+              this.displayBuildingInfo(this.selectedBuilding);
+            } else {
+              this.showMessage("Not enough resources");
+            }
+          }
+        },
+        canAfford
+      );
+    }
+  }
+  
+  /**
+   * Create button to train melee units
+   */
+  private createTrainMeleeButton() {
+    const { width, height } = this.scene.cameras.main;
+    const buttonX = width / 2 - 50;
+    const buttonY = height - UI_PANEL_HEIGHT / 2;
+    
+    // Check if local player owns this building
+    const playerId = this.scene.registry.get("localPlayerId");
+    
+    if (this.selectedBuilding && this.selectedBuilding.playerId === playerId) {
+      // Get cost
+      const unitCost = this.resourceManager.getUnitCost("melee");
+      const cost = `(F:${unitCost.food}/O:${unitCost.ore})`;
+      
+      // Check if player has resources
+      const canAfford = this.resourceManager.hasEnoughResources(playerId, unitCost.food, unitCost.ore);
+      
+      this.createActionButton(
+        buttonX, buttonY,
+        `Train Warrior ${cost}`,
+        () => {
+          if (this.selectedBuilding) {
+            // Deduct resources
+            if (this.resourceManager.deductResourcesForUnit(playerId, "melee")) {
+              // Add to production queue
+              this.buildingManager.queueUnitProduction(this.selectedBuilding.id, "melee");
+              
+              // Update resources
+              this.updateResources();
+              
+              // Refresh building info
+              this.displayBuildingInfo(this.selectedBuilding);
+            } else {
+              this.showMessage("Not enough resources");
+            }
+          }
+        },
+        canAfford
+      );
+    }
+  }
+  
+  /**
+   * Create button to train ranged units
+   */
+  private createTrainRangedButton() {
+    const { width, height } = this.scene.cameras.main;
+    const buttonX = width / 2 - 50;
+    const buttonY = height - UI_PANEL_HEIGHT / 2;
+    
+    // Check if local player owns this building
+    const playerId = this.scene.registry.get("localPlayerId");
+    
+    if (this.selectedBuilding && this.selectedBuilding.playerId === playerId) {
+      // Get cost
+      const unitCost = this.resourceManager.getUnitCost("ranged");
+      const cost = `(F:${unitCost.food}/O:${unitCost.ore})`;
+      
+      // Check if player has resources
+      const canAfford = this.resourceManager.hasEnoughResources(playerId, unitCost.food, unitCost.ore);
+      
+      this.createActionButton(
+        buttonX, buttonY,
+        `Train Archer ${cost}`,
+        () => {
+          if (this.selectedBuilding) {
+            // Deduct resources
+            if (this.resourceManager.deductResourcesForUnit(playerId, "ranged")) {
+              // Add to production queue
+              this.buildingManager.queueUnitProduction(this.selectedBuilding.id, "ranged");
+              
+              // Update resources
+              this.updateResources();
+              
+              // Refresh building info
+              this.displayBuildingInfo(this.selectedBuilding);
+            } else {
+              this.showMessage("Not enough resources");
+            }
+          }
+        },
+        canAfford
+      );
     }
   }
   

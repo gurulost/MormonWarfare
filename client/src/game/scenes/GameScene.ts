@@ -620,9 +620,15 @@ export class GameScene extends Phaser.Scene {
     );
   }
   
+  // Track the selected building ID
+  private selectedBuildingId: string | null = null;
+  
   private setupSelectionEvents() {
     // Start selection
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      // Skip if building placement is active
+      if (this.buildingPlacementActive) return;
+      
       if (pointer.leftButtonDown()) {
         this.selectionStart.x = pointer.worldX;
         this.selectionStart.y = pointer.worldY;
@@ -669,25 +675,67 @@ export class GameScene extends Phaser.Scene {
         // Calculate selection bounds
         const bounds = this.selectionRect.getBounds();
         
-        // Clear previous selection
+        // Clear previous selections
         this.selectedUnits = [];
+        this.selectedBuildingId = null;
         
-        // Select all units within bounds
-        this.selectedUnits = this.unitManager.selectUnitsInBounds(bounds, this.localPlayerId);
-        
-        // If no units were selected with the rectangle, try to select a single unit
-        if (this.selectedUnits.length === 0 && bounds.width < 5 && bounds.height < 5) {
+        // For small selections (clicks), try to select buildings first
+        if (bounds.width < 5 && bounds.height < 5) {
           const worldX = pointer.worldX;
           const worldY = pointer.worldY;
+          
+          // Try to select a building first
+          const tileX = Math.floor(worldX / TILE_SIZE);
+          const tileY = Math.floor(worldY / TILE_SIZE);
+          
+          // Get all buildings and find the one at the clicked position
+          const buildings = this.buildingManager.getAllBuildings();
+          for (const building of buildings) {
+            // Check if the click is within the building's bounds
+            // Buildings have size property
+            const buildingSize = building.size || 2; // Default to 2 if size not defined
+            
+            // Calculate building bounds
+            const buildingMinX = building.x;
+            const buildingMinY = building.y;
+            const buildingMaxX = building.x + buildingSize - 1;
+            const buildingMaxY = building.y + buildingSize - 1;
+            
+            if (tileX >= buildingMinX && tileX <= buildingMaxX &&
+                tileY >= buildingMinY && tileY <= buildingMaxY) {
+              // Found a building at the clicked position
+              this.selectedBuildingId = building.id;
+              
+              // Mark building as selected visually
+              building.setSelected(true);
+              
+              // Update UI with building selection
+              this.gameUI.updateSelection([], this.selectedBuildingId);
+              return;
+            }
+          }
+          
+          // If no building was clicked, try to select a unit
           const clickedUnit = this.unitManager.selectUnitAtPosition(worldX, worldY, this.localPlayerId);
           
           if (clickedUnit) {
             this.selectedUnits = [clickedUnit];
           }
+        } else {
+          // For larger selections (drag), select all units within bounds
+          this.selectedUnits = this.unitManager.selectUnitsInBounds(bounds, this.localPlayerId);
         }
         
         // Update UI with selection
         this.gameUI.updateSelection(this.selectedUnits);
+        
+        // Clear any previously selected buildings
+        const buildings = this.buildingManager.getAllBuildings();
+        for (const building of buildings) {
+          if (building.id !== this.selectedBuildingId) {
+            building.setSelected(false);
+          }
+        }
       }
     });
   }
