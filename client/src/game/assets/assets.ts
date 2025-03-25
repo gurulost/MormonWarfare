@@ -69,6 +69,12 @@ export function loadAssets(scene: Phaser.Scene) {
   createCircleTexture(scene, 'particle', 0xffff00, 8);
   createCircleTexture(scene, 'particle-blue', 0x00aaff, 8);
   createCircleTexture(scene, 'particle-red', 0xff5555, 8);
+  
+  // Ability effects particles
+  createCircleTexture(scene, 'smoke', 0x888888, 8, 0.5);
+  createCircleTexture(scene, 'spark', 0xffcc00, 4);
+  createCircleTexture(scene, 'shield', 0xffffff, 12, 0.6);
+  createTriangleTexture(scene, 'speed-arrow', 0xffcc00, 10, 0.8);
 }
 
 // Helper function to create a colored circle texture

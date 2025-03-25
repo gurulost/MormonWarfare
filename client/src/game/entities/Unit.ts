@@ -959,4 +959,157 @@ export class Unit {
     this.attackMoveTargetX = null;
     this.attackMoveTargetY = null;
   }
+  
+  /**
+   * Activate stealth mode for Lamanite Scouts
+   * Makes the unit harder to detect and reduces damage taken
+   */
+  activateStealth() {
+    if (this.type !== 'lamaniteScout' || this.faction !== 'Lamanites') {
+      console.warn('Only Lamanite Scouts can activate stealth');
+      return false;
+    }
+    
+    this.isStealthed = true;
+    
+    // Visual effects for stealth
+    const scene = this.sprite.scene;
+    
+    // Make the unit semi-transparent
+    this.sprite.setAlpha(0.6);
+    
+    // Add stealth particles effect (subtle smoke)
+    const particles = scene.add.particles(0, 0, 'smoke', {
+      speed: { min: 5, max: 10 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 0.2, end: 0 },
+      alpha: { start: 0.3, end: 0 },
+      lifespan: 2000,
+      frequency: 500,
+      quantity: 1
+    });
+    
+    this.sprite.add(particles);
+    this.abilityEffects.set('stealth', particles);
+    
+    // Create a temporary "STEALTH" indicator
+    const stealthText = scene.add.text(0, -25, "STEALTH", {
+      fontFamily: 'monospace',
+      fontSize: '10px',
+      color: '#cccccc',
+      stroke: '#000000',
+      strokeThickness: 2,
+    }).setOrigin(0.5);
+    
+    this.sprite.add(stealthText);
+    
+    // Fade out the stealth text
+    scene.tweens.add({
+      targets: stealthText,
+      alpha: 0,
+      y: -35,
+      duration: 1500,
+      onComplete: () => {
+        stealthText.destroy();
+      }
+    });
+    
+    console.log(`Scout ${this.id} activated stealth mode`);
+    return true;
+  }
+  
+  /**
+   * Deactivate stealth mode for Lamanite Scouts
+   */
+  deactivateStealth() {
+    if (!this.isStealthed) return;
+    
+    this.isStealthed = false;
+    
+    // Restore normal visibility
+    this.sprite.setAlpha(1.0);
+    
+    // Remove stealth particles effect
+    const stealthEffect = this.abilityEffects.get('stealth');
+    if (stealthEffect) {
+      stealthEffect.destroy();
+      this.abilityEffects.delete('stealth');
+    }
+    
+    console.log(`Scout ${this.id} deactivated stealth mode`);
+  }
+  
+  /**
+   * Apply a temporary speed boost to the unit
+   * @param multiplier Speed multiplier (e.g., 1.5 for 50% boost)
+   * @param duration Duration in milliseconds
+   */
+  applySpeedBoost(multiplier: number, duration: number) {
+    // Store the current speed multiplier
+    this.speedMultiplier = multiplier;
+    
+    // Update the speed
+    this.speed = this.baseSpeed * this.speedMultiplier;
+    
+    // Create visual effect for speed boost
+    const scene = this.sprite.scene;
+    
+    // Add speed lines particles
+    const particles = scene.add.particles(0, 0, 'spark', {
+      speed: { min: 10, max: 20 },
+      angle: { min: 160, max: 200 },
+      scale: { start: 0.2, end: 0 },
+      alpha: { start: 0.6, end: 0 },
+      lifespan: 300,
+      frequency: 100,
+      quantity: 2
+    });
+    
+    this.sprite.add(particles);
+    this.abilityEffects.set('speed', particles);
+    
+    // Create a temporary speed boost indicator
+    const boostText = scene.add.text(0, -25, "SPEED+", {
+      fontFamily: 'monospace',
+      fontSize: '10px',
+      color: '#ffff00',
+      stroke: '#000000',
+      strokeThickness: 2,
+    }).setOrigin(0.5);
+    
+    this.sprite.add(boostText);
+    
+    // Fade out the boost text
+    scene.tweens.add({
+      targets: boostText,
+      alpha: 0,
+      y: -35,
+      duration: 1500,
+      onComplete: () => {
+        boostText.destroy();
+      }
+    });
+    
+    // Reset after duration
+    scene.time.delayedCall(duration, () => {
+      this.clearSpeedBoost();
+    });
+    
+    console.log(`Unit ${this.id} received speed boost: ${multiplier}x for ${duration}ms`);
+  }
+  
+  /**
+   * Clear any active speed boost effect
+   */
+  clearSpeedBoost() {
+    this.speedMultiplier = 1;
+    this.speed = this.baseSpeed * this.speedMultiplier;
+    
+    // Remove speed particles effect
+    const speedEffect = this.abilityEffects.get('speed');
+    if (speedEffect) {
+      speedEffect.destroy();
+      this.abilityEffects.delete('speed');
+    }
+  }
 }
