@@ -26,6 +26,7 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
   const [localPlayerId, setLocalPlayerId] = useState<string>("");
   const [cameraPosition, setCameraPosition] = useState({ x: 0, y: 0, width: 10, height: 10 });
   const [overlayVisible, setOverlayVisible] = useState(true); // Default to 3D view
+  const [isTransitioning, setIsTransitioning] = useState(false);
   
   // Initialize and cleanup game data connection
   useEffect(() => {
