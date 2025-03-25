@@ -1273,10 +1273,11 @@ export class Unit {
     const scene = this.sprite.scene;
     
     // Find the stealth effect in the sprite container (should be at index 3)
-    let stealthEffect: Phaser.GameObjects.GameObject | null = null;
+    let stealthEffect: Phaser.GameObjects.Shape | null = null;
     for (let i = 0; i < this.sprite.length; i++) {
       const obj = this.sprite.getAt(i);
-      if (obj instanceof Phaser.GameObjects.Circle && obj.fillAlpha < 1) {
+      if (obj instanceof Phaser.GameObjects.Shape && 
+          'fillAlpha' in obj && (obj as any).fillAlpha < 1) {
         stealthEffect = obj;
         break;
       }
@@ -1358,11 +1359,12 @@ export class Unit {
     }
     
     // Find the faith shield effect in the sprite container (should be at index 3)
-    let faithShield: Phaser.GameObjects.GameObject | null = null;
+    let faithShield: Phaser.GameObjects.Shape | null = null;
     for (let i = 0; i < this.sprite.length; i++) {
       const obj = this.sprite.getAt(i);
-      if (obj instanceof Phaser.GameObjects.Circle && 
-          obj.fillColor === 0xffcc00 && obj.fillAlpha < 1) {
+      if (obj instanceof Phaser.GameObjects.Shape && 
+          'fillColor' in obj && 'fillAlpha' in obj && 
+          (obj as any).fillColor === 0xffcc00 && (obj as any).fillAlpha < 1) {
         faithShield = obj;
         break;
       }
@@ -1450,7 +1452,8 @@ export class Unit {
           // Find the stealth effect in the unit's sprite container
           for (let i = 0; i < unit.sprite.length; i++) {
             const obj = unit.sprite.getAt(i);
-            if (obj instanceof Phaser.GameObjects.Circle && obj.fillAlpha < 1) {
+            if (obj instanceof Phaser.GameObjects.Shape && 
+                'fillAlpha' in obj && (obj as any).fillAlpha < 1) {
               // Reset stealth visual effect
               scene.tweens.add({
                 targets: obj,

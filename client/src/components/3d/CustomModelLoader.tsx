@@ -1,150 +1,231 @@
-import React, { useRef, useEffect, useState, Suspense } from "react";
-import { useFrame } from "@react-three/fiber";
-import { useKeyboardControls, OrbitControls, useGLTF } from "@react-three/drei";
-import * as THREE from "three";
-import { GLTF } from "three-stdlib";
+import React, { useRef, useEffect, useState } from 'react';
+import { useFrame } from '@react-three/fiber';
+import { useGLTF } from '@react-three/drei';
+import * as THREE from 'three';
+import { GLTF } from 'three-stdlib';
 
-// Preload all custom models to avoid delays
-useGLTF.preload('/models/stripling_warrior.glb');
-useGLTF.preload('/models/lamanite_scout.glb');
-useGLTF.preload('/models/nephite_temple.glb');
-useGLTF.preload('/models/lamanite_tower.glb');
-
-interface CustomModelProps {
+type CustomModelProps = {
   modelPath: string;
-  position?: [number, number, number];
+  position: [number, number, number];
   rotation?: [number, number, number];
-  scale?: number | [number, number, number];
-  color?: string;
-  castShadow?: boolean;
-  receiveShadow?: boolean;
-}
+  scale?: number;
+  faction?: 'Nephites' | 'Lamanites';
+  isStealthed?: boolean;
+  hasFaithShield?: boolean;
+  animation?: string;
+  onClick?: () => void;
+};
 
-export const CustomModel: React.FC<CustomModelProps> = ({
+/**
+ * Component for loading and displaying custom GLB models for faction-specific units and buildings
+ */
+export const CustomModelLoader: React.FC<CustomModelProps> = ({
   modelPath,
-  position = [0, 0, 0],
+  position,
   rotation = [0, 0, 0],
   scale = 1,
-  color,
-  castShadow = true,
-  receiveShadow = true,
+  faction = 'Nephites',
+  isStealthed = false,
+  hasFaithShield = false,
+  animation,
+  onClick
 }) => {
   const modelRef = useRef<THREE.Group>(null);
   const [modelLoaded, setModelLoaded] = useState(false);
+  const [mixer, setMixer] = useState<THREE.AnimationMixer | null>(null);
+  const [currentAction, setCurrentAction] = useState<THREE.AnimationAction | null>(null);
   
-  // Load the GLB model
-  const { scene: customModel } = useGLTF(modelPath) as GLTF & {
-    scene: THREE.Group
+  // Preload the model
+  useGLTF.preload(modelPath);
+  
+  // Load the model with useGLTF
+  const { scene: originalScene, animations } = useGLTF(modelPath) as GLTF & {
+    scene: THREE.Group;
+    animations: THREE.AnimationClip[];
   };
   
-  // Track loading state
-  useEffect(() => {
-    if (customModel) {
-      setModelLoaded(true);
-      console.log(`Custom model loaded successfully: ${modelPath}`);
-    }
-  }, [customModel, modelPath]);
+  // Clone the scene to avoid modifying the cached original
+  const model = originalScene.clone();
   
-  // Optional animation
-  useFrame((state, delta) => {
-    if (modelRef.current) {
-      // You can add subtle animations or effects here if needed
-      // For example, idle breathing or subtle movement
-      // modelRef.current.rotation.y += delta * 0.1; // Slow rotation
+  // Effect for initial setup
+  useEffect(() => {
+    if (model && modelRef.current) {
+      setModelLoaded(true);
+      
+      // Apply any material adjustments based on faction
+      applyFactionColors(model, faction);
+      
+      // Apply effects for stealth or faith shield
+      applySpecialEffects(model, isStealthed, hasFaithShield);
+      
+      // Set up animation mixer if animations exist
+      if (animations.length > 0) {
+        const newMixer = new THREE.AnimationMixer(model);
+        setMixer(newMixer);
+        
+        // If animation is specified, play it
+        if (animation) {
+          const clip = animations.find(a => a.name === animation);
+          if (clip) {
+            const action = newMixer.clipAction(clip);
+            action.play();
+            setCurrentAction(action);
+          }
+        }
+      }
+      
+      console.log(`Custom model loaded: ${modelPath}`);
+    }
+  }, [model, modelRef.current, faction, isStealthed, hasFaithShield, animation]);
+  
+  // Effect for handling animation changes
+  useEffect(() => {
+    if (mixer && animations.length > 0 && animation) {
+      // Find the animation clip
+      const clip = animations.find(a => a.name === animation);
+      
+      if (clip) {
+        // Stop current animation if any
+        if (currentAction) {
+          currentAction.fadeOut(0.5);
+        }
+        
+        // Play new animation with crossfade
+        const newAction = mixer.clipAction(clip);
+        newAction.reset().fadeIn(0.5).play();
+        setCurrentAction(newAction);
+      }
+    }
+  }, [animation, mixer]);
+  
+  // Effect for handling stealth changes
+  useEffect(() => {
+    if (modelLoaded) {
+      applySpecialEffects(model, isStealthed, hasFaithShield);
+    }
+  }, [isStealthed, hasFaithShield]);
+  
+  // Update animations in the render loop
+  useFrame((_, delta) => {
+    if (mixer) {
+      mixer.update(delta);
+    }
+    
+    // Add subtle floating movement for some models
+    if (modelRef.current && modelPath.includes('stripling_warrior')) {
+      // Add subtle breathing movement
+      modelRef.current.position.y = position[1] + Math.sin(Date.now() * 0.002) * 0.05;
+    }
+    
+    // Add rotation for scout models to simulate alertness
+    if (modelRef.current && modelPath.includes('scout')) {
+      // Slow rotation to simulate scanning surroundings
+      modelRef.current.rotation.y += delta * 0.2;
+    }
+    
+    // Add glow effect pulse for faith shield
+    if (modelRef.current && hasFaithShield) {
+      // Faith shield effect will be handled by material updates
     }
   });
   
-  // Apply color to model materials if specified
-  useEffect(() => {
-    if (modelLoaded && customModel && color) {
-      customModel.traverse((node) => {
-        if (node instanceof THREE.Mesh && node.material) {
-          // Create a copy of the material to avoid affecting other instances
-          node.material = node.material.clone();
-          
-          if (node.material instanceof THREE.MeshStandardMaterial) {
-            node.material.color.set(color);
+  /**
+   * Apply faction-specific colors to the model materials
+   */
+  const applyFactionColors = (model: THREE.Group, faction: string) => {
+    if (faction === 'Nephites') {
+      // Nephite colors - blue and gold
+      model.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          // Only adjust non-metallic materials to preserve gold/silver
+          if (child.material instanceof THREE.MeshStandardMaterial && 
+              child.material.metalness < 0.5) {
+            // Apply blue tint to some materials
+            child.material = child.material.clone();
+            const hsl = { h: 0, s: 0, l: 0 };
+            new THREE.Color(child.material.color).getHSL(hsl);
+            
+            // Shift toward blue if not already metallic
+            if (hsl.s < 0.3) {
+              child.material.color.setHSL(0.6, 0.5, hsl.l);
+            }
+          }
+        }
+      });
+    } else if (faction === 'Lamanites') {
+      // Lamanite colors - red and brown
+      model.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          // Only adjust non-metallic materials
+          if (child.material instanceof THREE.MeshStandardMaterial && 
+              child.material.metalness < 0.5) {
+            // Apply red/brown tint
+            child.material = child.material.clone();
+            const hsl = { h: 0, s: 0, l: 0 };
+            new THREE.Color(child.material.color).getHSL(hsl);
+            
+            // Shift toward red/brown if not already metallic
+            if (hsl.s < 0.3) {
+              child.material.color.setHSL(0.05, 0.7, hsl.l);
+            }
           }
         }
       });
     }
-  }, [modelLoaded, customModel, color]);
-
-  // Apply shadows to all meshes in the model
-  useEffect(() => {
-    if (modelLoaded && customModel) {
-      customModel.traverse((node) => {
-        if (node instanceof THREE.Mesh) {
-          node.castShadow = castShadow;
-          node.receiveShadow = receiveShadow;
-        }
-      });
-    }
-  }, [modelLoaded, customModel, castShadow, receiveShadow]);
+  };
   
-  // Determine final scale as either uniform or non-uniform
-  const finalScale = Array.isArray(scale) 
-    ? scale 
-    : [scale, scale, scale];
+  /**
+   * Apply visual effects for special unit abilities
+   */
+  const applySpecialEffects = (model: THREE.Group, isStealthed: boolean, hasFaithShield: boolean) => {
+    model.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        // Handle stealth effect
+        if (isStealthed) {
+          if (child.material instanceof THREE.Material) {
+            child.material = child.material.clone();
+            child.material.transparent = true;
+            child.material.opacity = 0.6;
+          }
+        } else {
+          // Reset opacity if not stealthed
+          if (child.material instanceof THREE.Material) {
+            child.material.transparent = false;
+            child.material.opacity = 1.0;
+          }
+        }
+        
+        // Handle faith shield effect
+        if (hasFaithShield && child.material instanceof THREE.MeshStandardMaterial) {
+          child.material = child.material.clone();
+          // Add golden emission to simulate faith shield
+          child.material.emissive.setHex(0xffcc00);
+          // Pulsing emission in the animation frame
+          child.material.emissiveIntensity = 0.5 + 0.3 * Math.sin(Date.now() * 0.003);
+        }
+      }
+    });
+  };
   
   return (
     <group 
-      ref={modelRef} 
-      position={new THREE.Vector3(...position)}
-      rotation={new THREE.Euler(...rotation)}
-      scale={new THREE.Vector3(...finalScale)}
+      ref={modelRef}
+      position={position}
+      rotation={rotation as any}
+      scale={[scale, scale, scale]}
+      onClick={onClick}
     >
-      {modelLoaded && customModel ? (
-        <Suspense fallback={
-          <mesh castShadow={castShadow} receiveShadow={receiveShadow}>
-            <boxGeometry args={[1, 1, 1]} />
-            <meshStandardMaterial color="#FFFFFF" />
-          </mesh>
-        }>
-          <primitive object={customModel.clone()} castShadow={castShadow} receiveShadow={receiveShadow} />
-        </Suspense>
+      {modelLoaded ? (
+        <primitive object={model} />
       ) : (
-        <mesh castShadow={castShadow} receiveShadow={receiveShadow}>
+        // Fallback while loading
+        <mesh>
           <boxGeometry args={[1, 1, 1]} />
-          <meshStandardMaterial color="#FFFFFF" />
+          <meshStandardMaterial color={faction === 'Nephites' ? '#3366cc' : '#cc3300'} />
         </mesh>
       )}
     </group>
   );
 };
 
-// Helper function to get model path based on unit or building type
-export function getModelPathByType(
-  type: string, 
-  faction: 'Nephites' | 'Lamanites'
-): string {
-  // Unit models
-  if (type === 'striplingWarrior') {
-    return '/models/stripling_warrior.glb';
-  }
-  
-  if (type === 'lamaniteScout') {
-    return '/models/lamanite_scout.glb';
-  }
-  
-  // Building models
-  if (type === 'nephiteTemple') {
-    return '/models/nephite_temple.glb';
-  }
-  
-  if (type === 'lamaniteTower') {
-    return '/models/lamanite_tower.glb';
-  }
-  
-  // Fallback to default models
-  // We could add more conditionals here for regular units and buildings
-  // based on faction, but for now we'll just use placeholders
-  return '/models/placeholder.glb';
-}
-
-// Usage example:
-// <CustomModel 
-//   modelPath={getModelPathByType('striplingWarrior', 'Nephites')} 
-//   position={[0, 0, 0]} 
-//   scale={2.5} 
-// />
+export default CustomModelLoader;
