@@ -362,6 +362,43 @@ export class CombatManager {
       audioStore.playDeath(unitType);
     }
     
+    // Add camera shake for all unit deaths, with varying intensity by unit type
+    const cameraControls = (window as any).cameraControls;
+    if (cameraControls && cameraControls.shakeCamera) {
+      // Default values
+      let intensity = 0.2;
+      let duration = 250;
+      
+      // Adjust based on unit type for more dynamic feedback
+      switch (unitType) {
+        case 'hero':
+          // Hero deaths handled separately below
+          break;
+        case 'cavalry':
+          intensity = 0.4;
+          duration = 350;
+          break;
+        case 'melee':
+          intensity = 0.3;
+          duration = 300;
+          break;
+        case 'ranged':
+          intensity = 0.25;
+          duration = 250;
+          break;
+        case 'worker':
+          intensity = 0.15;
+          duration = 200;
+          break;
+      }
+      
+      // Only trigger for non-hero units as hero deaths have their own more dramatic effect
+      if (unitType !== 'hero') {
+        cameraControls.shakeCamera(intensity, duration, 'death');
+        console.log(`${unitType} death triggered camera shake: intensity ${intensity}`);
+      }
+    }
+    
     // Configure particle colors and effects based on unit type
     let mainColor = 0xff0000;   // Default red
     let secondaryColor = 0x000000;  // Dark/smoke particles
@@ -431,8 +468,17 @@ export class CombatManager {
         }
       });
       
-      // Screen shake for hero deaths
-      this.scene.cameras.main.shake(300, 0.005);
+      // Enhanced camera shake for hero deaths
+      // Use the new 3D camera shake if available
+      const cameraControls = (window as any).cameraControls;
+      if (cameraControls && cameraControls.shakeCamera) {
+        // Hero deaths get the most dramatic camera shake
+        cameraControls.shakeCamera(0.7, 500, 'death');
+        console.log('Hero death triggered enhanced camera shake');
+      } else {
+        // Fall back to Phaser's 2D camera shake
+        this.scene.cameras.main.shake(300, 0.005);
+      }
     }
     
     // Emit particles once
@@ -455,6 +501,37 @@ export class CombatManager {
     let impactColor = 0xffffff;
     let impactSize = 15;
     let impactSpeed = 300;
+    
+    // Add subtle camera shake for standard hit impacts based on attacker type
+    const cameraControls = (window as any).cameraControls;
+    if (cameraControls && cameraControls.shakeCamera) {
+      // Default values for shake
+      let intensity = 0.1;
+      let duration = 150;
+      
+      // Adjust based on attacker type for more dynamic feedback
+      switch (attackerType) {
+        case 'hero':
+          intensity = 0.25;
+          duration = 200;
+          break;
+        case 'cavalry':
+          intensity = 0.2;
+          duration = 180;
+          break;
+        case 'melee':
+          intensity = 0.15;
+          duration = 150; 
+          break;
+        case 'ranged':
+          intensity = 0.1;
+          duration = 120;
+          break;
+      }
+      
+      // Apply the shake
+      cameraControls.shakeCamera(intensity, duration, 'hit');
+    }
     
     switch (attackerType) {
       case 'melee':
@@ -618,7 +695,14 @@ export class CombatManager {
         // Create a visual effect to show counter bonus
         this.createCounterEffectVisual(defender.x, defender.y, true);
         
-        console.log(`Counter bonus! ${attackerType} is strong against ${defenderType}`);
+        // Add camera shake for counter bonus
+        const cameraControls = (window as any).cameraControls;
+        if (cameraControls && cameraControls.shakeCamera) {
+          cameraControls.shakeCamera(0.3, 250, 'counter');
+          console.log(`Counter bonus with camera shake! ${attackerType} is strong against ${defenderType}`);
+        } else {
+          console.log(`Counter bonus! ${attackerType} is strong against ${defenderType}`);
+        }
       }
       
       // Check for weakness penalty
@@ -630,7 +714,14 @@ export class CombatManager {
         // Create a visual effect to show weakness
         this.createCounterEffectVisual(attacker.x, attacker.y, false);
         
-        console.log(`Weakness penalty! ${attackerType} is weak against ${defenderType}`);
+        // Add subtle camera shake for weakness effect
+        const cameraControls = (window as any).cameraControls;
+        if (cameraControls && cameraControls.shakeCamera) {
+          cameraControls.shakeCamera(0.2, 200, 'weak');
+          console.log(`Weakness penalty with subtle shake! ${attackerType} is weak against ${defenderType}`);
+        } else {
+          console.log(`Weakness penalty! ${attackerType} is weak against ${defenderType}`);
+        }
       }
       
       // Check for critical hit (10% chance, higher for heroes)
@@ -640,10 +731,16 @@ export class CombatManager {
         damageMultiplier *= 1.5;
         hitType = 'critical';
         
-        // Add camera shake for critical hits
-        this.scene.cameras.main.shake(100, 0.003);
-        
-        console.log(`Critical hit! ${Math.round(damage * damageMultiplier)} damage`);
+        // Enhanced camera shake for critical hits
+        const cameraControls = (window as any).cameraControls;
+        if (cameraControls && cameraControls.shakeCamera) {
+          cameraControls.shakeCamera(0.4, 300, 'critical');
+          console.log(`Critical hit with enhanced camera shake! ${Math.round(damage * damageMultiplier)} damage`);
+        } else {
+          // Fall back to Phaser's 2D camera shake
+          this.scene.cameras.main.shake(100, 0.003);
+          console.log(`Critical hit! ${Math.round(damage * damageMultiplier)} damage`);
+        }
       }
     }
     
