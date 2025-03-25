@@ -268,87 +268,194 @@ export class CombatManager {
    */
   private createDamageIndicator(x: number, y: number, damage: number, hitType: 'normal' | 'critical' | 'counter' | 'weak' = 'normal'): void {
     // Configure text style based on hit type
-    let fontSize = "14px";
+    let fontSize = "16px";
     let color = "#ff6060";  // Default regular hit color
     let scaleEffect = 1;
     let yOffset = 40;
     let duration = 800;
+    let textPrefix = "";
+    let textSuffix = "";
     
     // Apply different styles based on hit type
     switch (hitType) {
       case 'critical':
-        fontSize = "18px";
+        fontSize = "22px";
         color = "#ff2020";  // Brighter red for critical hits
-        scaleEffect = 1.5;  // Bigger effect
-        yOffset = 60;       // Flies higher
+        scaleEffect = 1.8;  // Much bigger effect
+        yOffset = 70;       // Flies higher
+        duration = 1000;    // Longer animation
+        textPrefix = "CRIT! ";  // Add prefix text
         break;
       case 'counter':
-        fontSize = "16px";
-        color = "#60ff60";  // Green for counter hits
-        scaleEffect = 1.3;
-        yOffset = 50;
+        fontSize = "18px";
+        color = "#40ff40";  // Brighter green for counter hits
+        scaleEffect = 1.5;
+        yOffset = 60;
+        duration = 900;
+        textPrefix = "COUNTER! ";
         break;
       case 'weak':
-        fontSize = "12px";
-        color = "#c0c0c0";  // Gray/silver for weak hits
+        fontSize = "14px";
+        color = "#a0a0a0";  // Gray/silver for weak hits
         scaleEffect = 0.8;  // Smaller effect 
         yOffset = 30;
+        duration = 600;
+        textSuffix = " (weak)";  // Add suffix text
         break;
     }
     
-    // Create damage text that floats up and fades out
+    // Format the damage with prefix/suffix
+    const damageText = `${textPrefix}${Math.round(damage)}${textSuffix}`;
+    
+    // Create damage text that floats up and fades out with enhanced styling
     const text = this.scene.add.text(
       x, 
       y - 10, 
-      `${Math.round(damage)}`, 
+      damageText, 
       { 
         fontSize: fontSize, 
         color: color,
         stroke: "#000000",
-        strokeThickness: 2,
-        fontStyle: hitType === 'critical' || hitType === 'counter' ? 'bold' : 'normal'
+        strokeThickness: hitType === 'critical' ? 4 : 2,
+        fontStyle: hitType === 'critical' || hitType === 'counter' ? 'bold' : 'normal',
+        align: 'center',
+        shadow: hitType === 'critical' ? {
+          offsetX: 2,
+          offsetY: 2,
+          color: '#000000',
+          blur: 5,
+          fill: true
+        } : undefined
       }
     );
     
-    // Set initial scale
-    text.setScale(scaleEffect);
+    // Center the text for better visual appearance
+    text.setOrigin(0.5, 0.5);
     
-    // Create a more dynamic animation based on hit type
+    // Set initial scale with a small "pop" effect
+    text.setScale(0.5);
+    
+    // Create a two-part animation for more impact - first pop in, then float up and fade
+    // First part - quick pop in
     this.scene.tweens.add({
       targets: text,
-      y: y - yOffset,
-      alpha: 0,
-      scaleX: hitType === 'critical' ? scaleEffect * 1.5 : scaleEffect * 0.8,
-      scaleY: hitType === 'critical' ? scaleEffect * 1.5 : scaleEffect * 0.8,
-      duration: duration,
-      ease: hitType === 'critical' ? 'Bounce.easeOut' : 'Cubic.easeOut',
+      scaleX: scaleEffect * 1.2,
+      scaleY: scaleEffect * 1.2,
+      duration: 150,
+      ease: 'Back.easeOut',
       onComplete: () => {
-        text.destroy();
+        // Second part - float up and fade
+        this.scene.tweens.add({
+          targets: text,
+          y: y - yOffset,
+          alpha: 0,
+          scaleX: hitType === 'critical' ? scaleEffect * 1.5 : scaleEffect * 0.8,
+          scaleY: hitType === 'critical' ? scaleEffect * 1.5 : scaleEffect * 0.8,
+          duration: duration,
+          ease: hitType === 'critical' ? 'Bounce.easeOut' : 'Cubic.easeOut',
+          onComplete: () => {
+            text.destroy();
+          }
+        });
       }
     });
     
-    // For critical and counter hits, add a visual flash effect
-    if (hitType === 'critical' || hitType === 'counter') {
-      // Add a flash effect at the impact point
-      const flash = this.scene.add.circle(
-        x, 
-        y, 
-        20, 
-        hitType === 'critical' ? 0xff0000 : 0x00ff00, 
-        0.7
-      );
-      
-      // Animate the flash
-      this.scene.tweens.add({
-        targets: flash,
-        scaleX: 2,
-        scaleY: 2,
-        alpha: 0,
-        duration: 300,
-        onComplete: () => {
-          flash.destroy();
-        }
-      });
+    // Custom visual effects based on hit type
+    switch (hitType) {
+      case 'critical':
+        // Explosive radial effect for critical hits
+        const critFlash = this.scene.add.circle(x, y, 25, 0xff3333, 0.8);
+        this.scene.tweens.add({
+          targets: critFlash,
+          scaleX: 3,
+          scaleY: 3,
+          alpha: 0,
+          duration: 400,
+          ease: 'Cubic.easeOut',
+          onComplete: () => {
+            critFlash.destroy();
+          }
+        });
+        
+        // Add secondary starburst effect
+        const starburst = this.scene.add.particles(x, y, 'particle', {
+          speed: { min: 50, max: 150 },
+          angle: { min: 0, max: 360 },
+          scale: { start: 1.5, end: 0 },
+          lifespan: 500,
+          blendMode: 'ADD',
+          tint: 0xff5555,
+          quantity: 10,
+          emitting: false
+        });
+        starburst.explode();
+        this.scene.time.delayedCall(500, () => {
+          starburst.destroy();
+        });
+        break;
+        
+      case 'counter':
+        // Ripple effect for counter hits
+        const counterFlash = this.scene.add.circle(x, y, 20, 0x44ff44, 0.7);
+        this.scene.tweens.add({
+          targets: counterFlash,
+          scaleX: 2.5,
+          scaleY: 2.5,
+          alpha: 0,
+          duration: 350,
+          ease: 'Sine.easeOut',
+          onComplete: () => {
+            counterFlash.destroy();
+          }
+        });
+        
+        // Add a few green particles
+        const counterParticles = this.scene.add.particles(x, y, 'particle', {
+          speed: { min: 30, max: 80 },
+          angle: { min: 0, max: 360 },
+          scale: { start: 1, end: 0 },
+          lifespan: 400,
+          tint: 0x44ff44,
+          quantity: 8,
+          emitting: false
+        });
+        counterParticles.explode();
+        this.scene.time.delayedCall(400, () => {
+          counterParticles.destroy();
+        });
+        break;
+        
+      case 'weak':
+        // Subtle effect for weak hits
+        const weakFlash = this.scene.add.circle(x, y, 15, 0xaaaaaa, 0.5);
+        this.scene.tweens.add({
+          targets: weakFlash,
+          scaleX: 1.2,
+          scaleY: 1.2,
+          alpha: 0,
+          duration: 200,
+          ease: 'Quad.easeOut',
+          onComplete: () => {
+            weakFlash.destroy();
+          }
+        });
+        break;
+        
+      default:
+        // Standard hit effect
+        const flash = this.scene.add.circle(x, y, 15, 0xff6060, 0.6);
+        this.scene.tweens.add({
+          targets: flash,
+          scaleX: 1.5,
+          scaleY: 1.5,
+          alpha: 0,
+          duration: 250,
+          ease: 'Quad.easeOut',
+          onComplete: () => {
+            flash.destroy();
+          }
+        });
+        break;
     }
   }
   
