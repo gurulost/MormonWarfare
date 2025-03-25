@@ -262,32 +262,80 @@ export class MainMenuScene extends Phaser.Scene {
   }
   
   private initializeBackgroundMusic() {
-    // Get the HTML audio elements
-    const musicElement = document.getElementById("background-music") as HTMLAudioElement;
-    const hitSoundElement = document.getElementById("hit-sound") as HTMLAudioElement;
-    const successSoundElement = document.getElementById("success-sound") as HTMLAudioElement;
-    const criticalHitSoundElement = document.getElementById("critical-hit-sound") as HTMLAudioElement;
-    const counterAttackSoundElement = document.getElementById("counter-attack-sound") as HTMLAudioElement;
-    const weaknessHitSoundElement = document.getElementById("weakness-hit-sound") as HTMLAudioElement;
-    const deathSoundElement = document.getElementById("death-sound") as HTMLAudioElement;
-    
-    // Adjust volume for special sounds
-    if (criticalHitSoundElement) criticalHitSoundElement.volume = 0.4;
-    if (counterAttackSoundElement) counterAttackSoundElement.volume = 0.4;
-    if (weaknessHitSoundElement) weaknessHitSoundElement.volume = 0.3;
-    if (deathSoundElement) deathSoundElement.volume = 0.35;
-    
-    // Set up the audio store with all sound effects
-    const audioStore = useAudio.getState();
-    audioStore.setBackgroundMusic(musicElement);
-    audioStore.setHitSound(hitSoundElement);
-    audioStore.setSuccessSound(successSoundElement);
-    audioStore.setCriticalHitSound(criticalHitSoundElement);
-    audioStore.setCounterAttackSound(counterAttackSoundElement);
-    audioStore.setWeaknessHitSound(weaknessHitSoundElement);
-    audioStore.setDeathSound(deathSoundElement);
-    
-    console.log("Combat sound effects initialized");
+    try {
+      // Get the HTML audio elements
+      const musicElement = document.getElementById("background-music") as HTMLAudioElement;
+      const hitSoundElement = document.getElementById("hit-sound") as HTMLAudioElement;
+      const successSoundElement = document.getElementById("success-sound") as HTMLAudioElement;
+      const criticalHitSoundElement = document.getElementById("critical-hit-sound") as HTMLAudioElement;
+      const counterAttackSoundElement = document.getElementById("counter-attack-sound") as HTMLAudioElement;
+      const weaknessHitSoundElement = document.getElementById("weakness-hit-sound") as HTMLAudioElement;
+      const deathSoundElement = document.getElementById("death-sound") as HTMLAudioElement;
+
+      // Set up the audio store
+      const audioStore = useAudio.getState();
+
+      // Only set audio elements that exist
+      if (musicElement) {
+        console.log("Background music found");
+        audioStore.setBackgroundMusic(musicElement);
+      }
+
+      if (hitSoundElement) {
+        console.log("Hit sound found");
+        audioStore.setHitSound(hitSoundElement);
+      }
+
+      if (successSoundElement) {
+        console.log("Success sound found");
+        audioStore.setSuccessSound(successSoundElement);
+      }
+
+      // Set up enhanced combat sounds with proper fallbacks
+      // Critical hit can fall back to regular hit sound
+      if (criticalHitSoundElement) {
+        console.log("Critical hit sound found");
+        criticalHitSoundElement.volume = 0.4;
+        audioStore.setCriticalHitSound(criticalHitSoundElement);
+      } else if (hitSoundElement) {
+        console.log("Using hit sound for critical hits");
+        audioStore.setCriticalHitSound(hitSoundElement);
+      }
+
+      // Counter attack can fall back to hit sound
+      if (counterAttackSoundElement) {
+        console.log("Counter attack sound found");
+        counterAttackSoundElement.volume = 0.4;
+        audioStore.setCounterAttackSound(counterAttackSoundElement);
+      } else if (hitSoundElement) {
+        console.log("Using hit sound for counter attacks");
+        audioStore.setCounterAttackSound(hitSoundElement);
+      }
+
+      // Weakness hit can fall back to hit sound
+      if (weaknessHitSoundElement) {
+        console.log("Weakness hit sound found");
+        weaknessHitSoundElement.volume = 0.3;
+        audioStore.setWeaknessHitSound(weaknessHitSoundElement);
+      } else if (hitSoundElement) {
+        console.log("Using hit sound for weakness hits");
+        audioStore.setWeaknessHitSound(hitSoundElement);
+      }
+
+      // Death sound can fall back to hit sound
+      if (deathSoundElement) {
+        console.log("Death sound found");
+        deathSoundElement.volume = 0.35;
+        audioStore.setDeathSound(deathSoundElement);
+      } else if (hitSoundElement) {
+        console.log("Using hit sound for death effects");
+        audioStore.setDeathSound(hitSoundElement);
+      }
+
+      console.log("Combat sound effects initialized");
+    } catch (error) {
+      console.error("Error initializing audio:", error);
+    }
   }
   
   private toggleMusic() {

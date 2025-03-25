@@ -78,6 +78,10 @@ function App() {
       <audio id="background-music" src="/sounds/background.mp3" loop preload="auto"></audio>
       <audio id="hit-sound" src="/sounds/hit.mp3" preload="auto"></audio>
       <audio id="success-sound" src="/sounds/success.mp3" preload="auto"></audio>
+      <audio id="critical-hit-sound" src="/sounds/critical_hit.mp3" preload="auto"></audio>
+      <audio id="counter-attack-sound" src="/sounds/counter_attack.mp3" preload="auto"></audio>
+      <audio id="weakness-hit-sound" src="/sounds/weakness_hit.mp3" preload="auto"></audio>
+      <audio id="death-sound" src="/sounds/death.mp3" preload="auto"></audio>
     </div>
   );
 }
