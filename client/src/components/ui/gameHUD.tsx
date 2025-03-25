@@ -505,6 +505,7 @@ const ResourceDisplay: React.FC<{ resources: ResourceData }> = ({ resources }) =
 };
 
 // Tooltips for unit/building cards with detailed information
+// Define a more specific unit type interface later if needed
 const UnitTooltip: React.FC<{ unit: any }> = ({ unit }) => {
   return (
     <div className="p-2 max-w-xs">
@@ -1320,8 +1321,8 @@ export const GameHUD: React.FC<{
                               <p className="text-xs font-semibold">Effects:</p>
                               <ul className="text-xs list-disc pl-4">
                                 {Object.entries(tech.effects).map(([key, value]) => (
-                                  <li key={key}>{key}: {value}</li>
-                                ))}
+                                  <li key={key}>{key}: {String(value)}</li>
+                                )) as React.ReactNode}
                               </ul>
                             </div>
                           )}
@@ -1330,10 +1331,10 @@ export const GameHUD: React.FC<{
                             <div className="mt-2">
                               <p className="text-xs font-semibold">Unlocks:</p>
                               <ul className="text-xs list-disc pl-4">
-                                {tech.unlocks.units && tech.unlocks.units.map(unit => (
+                                {tech.unlocks.units && tech.unlocks.units.map((unit: any) => (
                                   <li key={unit}>Unit: {unit}</li>
                                 ))}
-                                {tech.unlocks.buildings && tech.unlocks.buildings.map(building => (
+                                {tech.unlocks.buildings && tech.unlocks.buildings.map((building: any) => (
                                   <li key={building}>Building: {building}</li>
                                 ))}
                               </ul>
@@ -1355,27 +1356,110 @@ export const GameHUD: React.FC<{
             </ScrollArea>
           </TabsContent>
 
-          {/* Selected Units/Buildings Tab Content */}
+          {/* Selected Units/Buildings Tab Content - Enhanced with more contextual details */}
           <TabsContent value="selected" className="mt-0">
             <ScrollArea className="h-40">
               <div className="p-2">
                 {selectedUnits.length > 0 && (
                   <div>
-                    <h3 className="font-bold mb-2">Selected Units ({selectedUnits.length})</h3>
+                    {/* Unit selection summary with unit type counts */}
+                    <div className="flex justify-between items-center mb-2">
+                      <h3 className="font-bold">Selected Units ({selectedUnits.length})</h3>
+                      <div className="flex gap-2">
+                        {/* Count units by type */}
+                        {(() => {
+                          const unitCounts: Record<string, number> = {};
+                          selectedUnits.forEach((unit: any) => {
+                            unitCounts[unit.type] = (unitCounts[unit.type] || 0) + 1;
+                          });
+                          
+                          return Object.entries(unitCounts).map(([type, count]) => (
+                            <Badge key={type} className="bg-gray-700 text-white text-xs">
+                              {count}× {type}
+                            </Badge>
+                          ));
+                        })() as React.ReactNode}
+                      </div>
+                    </div>
+                    
+                    {/* Unit stance controls - only show when units are selected */}
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mb-3 bg-gray-800/50 p-2 rounded-md"
+                    >
+                      <p className="text-xs mb-1 font-semibold">Unit Stance:</p>
+                      <ToggleGroup type="single" size="sm" className="justify-start">
+                        <ToggleGroupItem value="aggressive" aria-label="Aggressive stance" className="h-7 px-2 py-1 data-[state=on]:bg-red-600/70">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center">
+                                  <Sword className="h-3 w-3 mr-1" />
+                                  <span className="text-xs">Aggressive</span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                <p className="text-xs">Units will chase enemies and attack on sight</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </ToggleGroupItem>
+                        <ToggleGroupItem value="defensive" aria-label="Defensive stance" className="h-7 px-2 py-1 data-[state=on]:bg-blue-600/70">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center">
+                                  <Shield className="h-3 w-3 mr-1" />
+                                  <span className="text-xs">Defensive</span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                <p className="text-xs">Units will attack enemies in range but won't chase far</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </ToggleGroupItem>
+                        <ToggleGroupItem value="hold" aria-label="Hold position stance" className="h-7 px-2 py-1 data-[state=on]:bg-yellow-600/70">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center">
+                                  <span className="text-xs">Hold Position</span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                <p className="text-xs">Units will not move but will attack enemies in range</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </ToggleGroupItem>
+                      </ToggleGroup>
+                    </motion.div>
+                    
+                    {/* Unit cards with more details */}
                     <div className="grid grid-cols-4 gap-2 mb-4">
-                      {selectedUnits.map((unit) => (
+                      {selectedUnits.map((unit: any) => (
                         <TooltipProvider key={unit.id}>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <motion.div
                                 whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
                               >
-                                <Card className="p-2 bg-gray-700/50">
+                                <Card className="p-2 bg-gray-700/50 border-l-2" style={{
+                                  borderLeftColor: unit.stance === 'aggressive' ? '#dc2626' : 
+                                                   unit.stance === 'defensive' ? '#2563eb' : 
+                                                   unit.stance === 'hold-position' ? '#ca8a04' : '#6b7280'
+                                }}>
                                   <div className="text-center">
                                     <h4 className="font-semibold capitalize">{unit.type}</h4>
                                     <div className="w-full bg-gray-800 h-2 mt-1 rounded-full">
                                       <div 
-                                        className="bg-green-500 h-2 rounded-full" 
+                                        className={`h-2 rounded-full ${
+                                          (unit.health / unit.maxHealth) > 0.6 ? 'bg-green-500' :
+                                          (unit.health / unit.maxHealth) > 0.3 ? 'bg-yellow-500' : 'bg-red-500'
+                                        }`}
                                         style={{ 
                                           width: `${(unit.health / unit.maxHealth) * 100}%` 
                                         }}
@@ -1385,6 +1469,28 @@ export const GameHUD: React.FC<{
                                       <div>{Math.floor(unit.health)}/{unit.maxHealth}</div>
                                       <div>ATK: {unit.attack}</div>
                                     </div>
+                                    
+                                    {/* Show current activity indicator (if available) */}
+                                    {unit.isMoving && (
+                                      <div className="mt-1 text-xs bg-blue-900/50 rounded px-1 py-0.5">
+                                        Moving
+                                      </div>
+                                    )}
+                                    {unit.isGathering && (
+                                      <div className="mt-1 text-xs bg-green-900/50 rounded px-1 py-0.5">
+                                        Gathering
+                                      </div>
+                                    )}
+                                    {unit.isAttacking && (
+                                      <div className="mt-1 text-xs bg-red-900/50 rounded px-1 py-0.5">
+                                        Attacking
+                                      </div>
+                                    )}
+                                    {unit.isPatrolling && (
+                                      <div className="mt-1 text-xs bg-purple-900/50 rounded px-1 py-0.5">
+                                        Patrolling
+                                      </div>
+                                    )}
                                   </div>
                                 </Card>
                               </motion.div>
@@ -1403,19 +1509,23 @@ export const GameHUD: React.FC<{
                   <div>
                     <h3 className="font-bold mb-2">Selected Buildings ({selectedBuildings.length})</h3>
                     <div className="grid grid-cols-3 gap-2">
-                      {selectedBuildings.map((building) => (
+                      {selectedBuildings.map((building: any) => (
                         <TooltipProvider key={building.id}>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <motion.div
                                 whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
                               >
-                                <Card className="p-2 bg-gray-700/50">
+                                <Card className="p-2 bg-gray-700/50 hover:bg-gray-600/50">
                                   <div className="text-center">
                                     <h4 className="font-semibold capitalize">{building.type}</h4>
                                     <div className="w-full bg-gray-800 h-2 mt-1 rounded-full">
                                       <div 
-                                        className="bg-green-500 h-2 rounded-full" 
+                                        className={`h-2 rounded-full ${
+                                          (building.health / building.maxHealth) > 0.6 ? 'bg-green-500' :
+                                          (building.health / building.maxHealth) > 0.3 ? 'bg-yellow-500' : 'bg-red-500'
+                                        }`}
                                         style={{ 
                                           width: `${(building.health / building.maxHealth) * 100}%` 
                                         }}
@@ -1425,14 +1535,27 @@ export const GameHUD: React.FC<{
                                       <div>HP: {Math.floor(building.health)}/{building.maxHealth}</div>
                                       <div>DEF: {building.defense}</div>
                                     </div>
+                                    
+                                    {/* Enhanced production queue visualization */}
                                     {building.productionQueue && building.productionQueue.length > 0 && (
                                       <div className="mt-2 text-xs">
-                                        <p>Building: {building.productionQueue[0].type}</p>
-                                        <Progress 
-                                          value={(1 - building.productionQueue[0].remainingTime / 
-                                            building.getProductionTime(building.productionQueue[0].type)) * 100}
-                                          className="h-1 mt-1"
-                                        />
+                                        <div className="flex justify-between items-center mb-1">
+                                          <span className="font-semibold">Production:</span>
+                                          <Badge variant="outline" className="h-4 text-xs px-1">
+                                            {building.productionQueue.length} in queue
+                                          </Badge>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <span className="capitalize">{building.productionQueue[0].type}</span>
+                                          <Progress 
+                                            value={(1 - building.productionQueue[0].remainingTime / 
+                                              building.getProductionTime(building.productionQueue[0].type)) * 100}
+                                            className="h-1 flex-grow"
+                                          />
+                                          <span className="text-xs opacity-80">
+                                            {Math.ceil(building.productionQueue[0].remainingTime / 1000)}s
+                                          </span>
+                                        </div>
                                       </div>
                                     )}
                                   </div>
@@ -1450,7 +1573,7 @@ export const GameHUD: React.FC<{
                                   <div className="mt-2 text-xs">
                                     <p className="font-semibold">Production Queue:</p>
                                     <ol className="pl-4 list-decimal">
-                                      {building.productionQueue.map((item, idx) => (
+                                      {building.productionQueue.map((item: any, idx: number) => (
                                         <li key={idx}>
                                           {item.type}: {Math.round(item.remainingTime / 1000)}s remaining
                                         </li>
