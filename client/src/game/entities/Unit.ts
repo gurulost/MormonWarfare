@@ -1248,4 +1248,246 @@ export class Unit {
       this.abilityEffects.delete('speed');
     }
   }
+  
+  /**
+   * Check if this unit is in stealth mode (for Lamanite scouts)
+   */
+  isInStealth(): boolean {
+    return this.isStealthed;
+  }
+  
+  /**
+   * Toggle stealth mode for Lamanite Scouts
+   * Stealth makes the unit harder to detect and reduces damage taken
+   */
+  toggleStealth(): boolean {
+    // Only Lamanite scouts can use stealth
+    if (this.type !== 'lamaniteScout' || this.faction !== 'Lamanites') {
+      return false;
+    }
+    
+    // Toggle stealth mode
+    this.isStealthed = !this.isStealthed;
+    
+    // Perform visual effects for stealth toggle
+    const scene = this.sprite.scene;
+    
+    // Find the stealth effect in the sprite container (should be at index 3)
+    let stealthEffect: Phaser.GameObjects.GameObject | null = null;
+    for (let i = 0; i < this.sprite.length; i++) {
+      const obj = this.sprite.getAt(i);
+      if (obj instanceof Phaser.GameObjects.Circle && obj.fillAlpha < 1) {
+        stealthEffect = obj;
+        break;
+      }
+    }
+    
+    if (stealthEffect) {
+      if (this.isStealthed) {
+        // Entering stealth: increase the transparency effect
+        scene.tweens.add({
+          targets: stealthEffect,
+          fillAlpha: 0.7,
+          duration: 500,
+          ease: 'Sine.easeOut'
+        });
+        
+        // Make the whole unit semi-transparent
+        scene.tweens.add({
+          targets: this.sprite,
+          alpha: 0.6,
+          duration: 500,
+          ease: 'Sine.easeOut'
+        });
+        
+        // Speed penalty while in stealth
+        this.speed = this.baseSpeed * 0.8;
+        
+        // Play stealth sound
+        const audio = document.getElementById('counter-attack-sound') as HTMLAudioElement;
+        if (audio) {
+          audio.volume = 0.3; // Lower volume for stealth
+          audio.play().catch(e => console.log("Sound play prevented:", e));
+        }
+      } else {
+        // Exiting stealth: decrease the transparency effect
+        scene.tweens.add({
+          targets: stealthEffect,
+          fillAlpha: 0.3,
+          duration: 300,
+          ease: 'Sine.easeIn'
+        });
+        
+        // Restore normal visibility
+        scene.tweens.add({
+          targets: this.sprite,
+          alpha: 1.0,
+          duration: 300,
+          ease: 'Sine.easeIn'
+        });
+        
+        // Restore normal speed
+        this.speed = this.baseSpeed;
+        
+        // Play reveal sound
+        const audio = document.getElementById('hit-sound') as HTMLAudioElement;
+        if (audio) {
+          audio.play().catch(e => console.log("Sound play prevented:", e));
+        }
+      }
+    }
+    
+    console.log(`Lamanite Scout ${this.isStealthed ? 'entered' : 'exited'} stealth mode`);
+    return true;
+  }
+  
+  /**
+   * Manually activate the Faith Shield for Stripling Warriors
+   * This provides a one-time protection from a lethal attack
+   */
+  activateFaithShield(): boolean {
+    // Only Stripling Warriors can use faith shield
+    if (this.type !== 'striplingWarrior' || this.faction !== 'Nephites') {
+      return false;
+    }
+    
+    // Can't activate if already used
+    if (this.usedFaithShield) {
+      console.log("Faith Shield has already been used");
+      return false;
+    }
+    
+    // Find the faith shield effect in the sprite container (should be at index 3)
+    let faithShield: Phaser.GameObjects.GameObject | null = null;
+    for (let i = 0; i < this.sprite.length; i++) {
+      const obj = this.sprite.getAt(i);
+      if (obj instanceof Phaser.GameObjects.Circle && 
+          obj.fillColor === 0xffcc00 && obj.fillAlpha < 1) {
+        faithShield = obj;
+        break;
+      }
+    }
+    
+    if (faithShield) {
+      const scene = this.sprite.scene;
+      
+      // Create dramatic activation effect
+      scene.tweens.add({
+        targets: faithShield,
+        fillAlpha: 0.9,
+        scale: 1.5,
+        duration: 800,
+        yoyo: true,
+        repeat: 1,
+        ease: 'Sine.easeOut',
+        onComplete: () => {
+          // Reset to subtle glow
+          (faithShield as Phaser.GameObjects.Shape).setAlpha(0.2).setScale(1);
+        }
+      });
+      
+      // Create a burst of light
+      const burst = scene.add.circle(0, 0, 40, 0xffffff, 0.9);
+      this.sprite.add(burst);
+      
+      // Animate the burst
+      scene.tweens.add({
+        targets: burst,
+        alpha: 0,
+        scale: 2,
+        duration: 800,
+        ease: 'Sine.easeOut',
+        onComplete: () => {
+          burst.destroy();
+        }
+      });
+      
+      // Apply temporary defense boost
+      this.defenseMultiplier = 1.5; // 50% defense boost
+      
+      // Reset after 5 seconds
+      setTimeout(() => {
+        this.defenseMultiplier = 1.0;
+      }, 5000);
+      
+      // Play appropriate sound
+      const audio = document.getElementById('success-sound') as HTMLAudioElement;
+      if (audio) {
+        audio.play().catch(e => console.log("Sound play prevented:", e));
+      }
+      
+      console.log("Faith Shield activated! Defense increased for 5 seconds");
+      return true;
+    }
+    
+    return false;
+  }
+  
+  /**
+   * Reveal stealth units in an area - useful for counter abilities
+   */
+  revealStealthUnits(units: Unit[], range: number = 3): Unit[] {
+    // Convert current position to grid coordinates
+    const currentX = Math.floor(this.x / TILE_SIZE);
+    const currentY = Math.floor(this.y / TILE_SIZE);
+    
+    // Calculate tile distance for each unit
+    const revealedUnits: Unit[] = [];
+    
+    units.forEach(unit => {
+      if (unit.isStealthed) {
+        const unitX = Math.floor(unit.x / TILE_SIZE);
+        const unitY = Math.floor(unit.y / TILE_SIZE);
+        
+        const distance = Math.abs(unitX - currentX) + Math.abs(unitY - currentY);
+        
+        if (distance <= range) {
+          unit.isStealthed = false;
+          
+          // Force unit to exit stealth mode
+          const scene = this.sprite.scene;
+          
+          // Find the stealth effect in the unit's sprite container
+          for (let i = 0; i < unit.sprite.length; i++) {
+            const obj = unit.sprite.getAt(i);
+            if (obj instanceof Phaser.GameObjects.Circle && obj.fillAlpha < 1) {
+              // Reset stealth visual effect
+              scene.tweens.add({
+                targets: obj,
+                fillAlpha: 0.3,
+                duration: 300,
+                ease: 'Sine.easeIn'
+              });
+              break;
+            }
+          }
+          
+          // Restore normal visibility
+          scene.tweens.add({
+            targets: unit.sprite,
+            alpha: 1.0,
+            duration: 300,
+            ease: 'Sine.easeIn'
+          });
+          
+          // Restore normal speed
+          unit.speed = unit.baseSpeed;
+          
+          revealedUnits.push(unit);
+        }
+      }
+    });
+    
+    if (revealedUnits.length > 0) {
+      // Play reveal sound
+      const audio = document.getElementById('weakness-hit-sound') as HTMLAudioElement;
+      if (audio) {
+        audio.play().catch(e => console.log("Sound play prevented:", e));
+      }
+      
+      console.log(`Revealed ${revealedUnits.length} stealthed units!`);
+    }
+    
+    return revealedUnits;
+  }
 }
