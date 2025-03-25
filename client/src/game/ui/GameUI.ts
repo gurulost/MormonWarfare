@@ -241,7 +241,9 @@ export class GameUI {
       align: "center"
     }).setOrigin(0.5);
     
-    this.productionQueueContainer.add([bg, title]);
+    if (this.productionQueueContainer) {
+      this.productionQueueContainer.add([bg, title]);
+    }
     
     // No items in queue
     if (queue.length === 0) {
@@ -252,7 +254,9 @@ export class GameUI {
         align: "center"
       }).setOrigin(0.5);
       
-      this.productionQueueContainer.add(emptyText);
+      if (this.productionQueueContainer) {
+        this.productionQueueContainer.add(emptyText);
+      }
       return;
     }
     
@@ -278,7 +282,9 @@ export class GameUI {
       color: "#ffffff"
     }).setOrigin(1, 0.5);
     
-    this.productionQueueContainer.add([currentItemText, progressBarBg, progressBarFill, percentText]);
+    if (this.productionQueueContainer) {
+      this.productionQueueContainer.add([currentItemText, progressBarBg, progressBarFill, percentText]);
+    }
     
     // Add remaining queue items (limited to showing 3 for space)
     const queueToShow = queue.slice(1, 4);
@@ -312,7 +318,9 @@ export class GameUI {
           }
         });
       
-      this.productionQueueContainer.add([itemText, cancelBtn]);
+      if (this.productionQueueContainer) {
+        this.productionQueueContainer.add([itemText, cancelBtn]);
+      }
     });
     
     // If there are more items than shown
@@ -323,7 +331,9 @@ export class GameUI {
         color: "#aaaaaa"
       }).setOrigin(0.5);
       
-      this.productionQueueContainer.add(moreText);
+      if (this.productionQueueContainer) {
+        this.productionQueueContainer.add(moreText);
+      }
     }
   }
   
