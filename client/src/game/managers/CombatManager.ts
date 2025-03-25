@@ -140,18 +140,57 @@ export class CombatManager {
         
         // Check if in range
         if (tileDistance <= unit.range) {
+          // Determine hit type for enhanced feedback
+          let hitType: 'normal' | 'critical' | 'counter' | 'weak' = 'normal';
+          
+          // Apply counter system and determine hit type
+          const attackerType = unit.type as UnitType;
+          const defenderType = targetUnit.type as UnitType;
+          
+          // Check for counter advantage
+          if (this.isCounterUnit(attackerType, defenderType)) {
+            hitType = 'counter';
+          }
+          
+          // Check for weakness
+          if (this.isWeakToUnit(attackerType, defenderType)) {
+            hitType = 'weak';
+          }
+          
+          // Random chance for critical hit (10% chance, more for heroes)
+          const critChance = attackerType === 'hero' ? 0.15 : 0.1;
+          if (Math.random() < critChance) {
+            hitType = 'critical';
+          }
+          
           // Attack the target with the counter system
           const damage = this.calculateDamage(unit.attack, targetUnit.defense, unit, targetUnit);
           const killed = targetUnit.takeDamage(damage);
           
-          // Play hit sound
+          // Create visual hit impact effect based on unit types
+          this.createHitImpactEffect(targetUnit.x, targetUnit.y, attackerType, defenderType);
+          
+          // Play appropriate hit sound based on hit type
           const audioStore = useAudio.getState();
           if (!audioStore.isMuted) {
-            audioStore.playHit();
+            switch (hitType) {
+              case 'critical':
+                audioStore.playCriticalHit();
+                break;
+              case 'counter':
+                audioStore.playCounterAttack();
+                break;
+              case 'weak':
+                audioStore.playWeaknessHit();
+                break;
+              default:
+                audioStore.playHit();
+                break;
+            }
           }
           
-          // Create visual damage indicator
-          this.createDamageIndicator(targetUnit.x, targetUnit.y, damage);
+          // Create visual damage indicator with appropriate style
+          this.createDamageIndicator(targetUnit.x, targetUnit.y, damage, hitType);
           
           // If target is killed, remove it
           if (killed) {
@@ -163,13 +202,26 @@ export class CombatManager {
             
             // Add exp to the unit that got the kill (could be used for veterancy system)
             // unit.addExperience(10);
+            
+            // Find new target if in aggressive stance
+            if (unit.stance === 'aggressive') {
+              const newTarget = this.findNearestEnemyUnit(unit, units, unit.range * 2);
+              if (newTarget) {
+                unit.setAttackingTarget(newTarget.id);
+              }
+            }
+          }
+          
+          // Add small camera shake on critical hits or hero attacks
+          if (hitType === 'critical' || attackerType === 'hero') {
+            this.scene.cameras.main.shake(100, 0.003);
           }
         } else {
           // Move toward target
           const targetTileX = Math.floor(targetUnit.x / TILE_SIZE);
           const targetTileY = Math.floor(targetUnit.y / TILE_SIZE);
           
-          // Update the path every few seconds
+          // Update the path every few seconds if not already moving
           if (!unit.isMoving) {
             this.unitManager.moveUnitsTo([unit.id], targetTileX, targetTileY);
           }
@@ -182,51 +234,310 @@ export class CombatManager {
   }
   
   /**
-   * Creates a visual damage indicator
+   * Creates an enhanced visual damage indicator with different styles based on hit type
    */
-  private createDamageIndicator(x: number, y: number, damage: number): void {
+  private createDamageIndicator(x: number, y: number, damage: number, hitType: 'normal' | 'critical' | 'counter' | 'weak' = 'normal'): void {
+    // Configure text style based on hit type
+    let fontSize = "14px";
+    let color = "#ff6060";  // Default regular hit color
+    let scaleEffect = 1;
+    let yOffset = 40;
+    let duration = 800;
+    
+    // Apply different styles based on hit type
+    switch (hitType) {
+      case 'critical':
+        fontSize = "18px";
+        color = "#ff2020";  // Brighter red for critical hits
+        scaleEffect = 1.5;  // Bigger effect
+        yOffset = 60;       // Flies higher
+        break;
+      case 'counter':
+        fontSize = "16px";
+        color = "#60ff60";  // Green for counter hits
+        scaleEffect = 1.3;
+        yOffset = 50;
+        break;
+      case 'weak':
+        fontSize = "12px";
+        color = "#c0c0c0";  // Gray/silver for weak hits
+        scaleEffect = 0.8;  // Smaller effect 
+        yOffset = 30;
+        break;
+    }
+    
     // Create damage text that floats up and fades out
     const text = this.scene.add.text(
       x, 
       y - 10, 
       `${Math.round(damage)}`, 
       { 
-        fontSize: "14px", 
-        color: "#ff6060",
+        fontSize: fontSize, 
+        color: color,
         stroke: "#000000",
-        strokeThickness: 2
+        strokeThickness: 2,
+        fontStyle: hitType === 'critical' || hitType === 'counter' ? 'bold' : 'normal'
       }
     );
     
-    // Animate the damage text
+    // Set initial scale
+    text.setScale(scaleEffect);
+    
+    // Create a more dynamic animation based on hit type
     this.scene.tweens.add({
       targets: text,
-      y: y - 40,
+      y: y - yOffset,
       alpha: 0,
-      duration: 800,
+      scaleX: hitType === 'critical' ? scaleEffect * 1.5 : scaleEffect * 0.8,
+      scaleY: hitType === 'critical' ? scaleEffect * 1.5 : scaleEffect * 0.8,
+      duration: duration,
+      ease: hitType === 'critical' ? 'Bounce.easeOut' : 'Cubic.easeOut',
       onComplete: () => {
         text.destroy();
       }
     });
+    
+    // For critical and counter hits, add a visual flash effect
+    if (hitType === 'critical' || hitType === 'counter') {
+      // Add a flash effect at the impact point
+      const flash = this.scene.add.circle(
+        x, 
+        y, 
+        20, 
+        hitType === 'critical' ? 0xff0000 : 0x00ff00, 
+        0.7
+      );
+      
+      // Animate the flash
+      this.scene.tweens.add({
+        targets: flash,
+        scaleX: 2,
+        scaleY: 2,
+        alpha: 0,
+        duration: 300,
+        onComplete: () => {
+          flash.destroy();
+        }
+      });
+    }
   }
   
   /**
-   * Creates a death effect when a unit is killed
+   * Creates an enhanced death effect when a unit is killed with more visual feedback
    */
   private createDeathEffect(x: number, y: number, unitType: UnitType): void {
-    // Create particles for death effect
-    const particles = this.scene.add.particles(x, y, 'particle', {
-      speed: { min: 50, max: 150 },
+    // Play appropriate death sound
+    const audioStore = useAudio.getState();
+    if (!audioStore.isMuted) {
+      audioStore.playDeath(unitType);
+    }
+    
+    // Configure particle colors and effects based on unit type
+    let mainColor = 0xff0000;   // Default red
+    let secondaryColor = 0x000000;  // Dark/smoke particles
+    let particleCount = 30;
+    
+    switch (unitType) {
+      case 'hero':
+        mainColor = 0xffff00;        // Gold particles for heroes
+        secondaryColor = 0xff6600;   // Orange/flame particles
+        particleCount = 60;          // More particles for heroes
+        break;
+      case 'melee':
+        mainColor = 0xff3333;        // Bright red for melee
+        secondaryColor = 0x993333;   // Darker red
+        break;
+      case 'ranged':
+        mainColor = 0x33ccff;        // Blue for ranged
+        secondaryColor = 0x3366ff;   // Darker blue
+        break;
+      case 'cavalry':
+        mainColor = 0xffcc00;        // Golden yellow for cavalry
+        secondaryColor = 0xcc6600;   // Brown
+        break;
+      case 'worker':
+        mainColor = 0xffff00;        // Yellow for workers
+        secondaryColor = 0x666666;   // Gray
+        particleCount = 20;          // Fewer particles for workers
+        break;
+    }
+    
+    // Primary explosion particles
+    const mainParticles = this.scene.add.particles(x, y, 'particle', {
+      speed: { min: 70, max: 180 },
       angle: { min: 0, max: 360 },
-      scale: { start: 1, end: 0 },
+      scale: { start: 1.5, end: 0 },
       lifespan: 800,
       blendMode: 'ADD',
-      tint: unitType === 'worker' ? 0xffff00 : 0xff0000
+      tint: mainColor,
+      quantity: particleCount,
+      emitting: false
     });
     
-    // Auto-destroy the emitter after it's done
-    this.scene.time.delayedCall(800, () => {
-      particles.destroy();
+    // Secondary smoke/debris particles
+    const secondaryParticles = this.scene.add.particles(x, y, 'particle', {
+      speed: { min: 30, max: 100 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 1, end: 0.3 },
+      lifespan: 1200,
+      blendMode: 'NORMAL',
+      tint: secondaryColor,
+      quantity: Math.floor(particleCount * 0.7),
+      emitting: false
+    });
+    
+    // For heroes, add a shockwave effect
+    if (unitType === 'hero') {
+      const shockwave = this.scene.add.circle(x, y, 10, 0xffffcc, 0.7);
+      this.scene.tweens.add({
+        targets: shockwave,
+        scaleX: 10,
+        scaleY: 10,
+        alpha: 0,
+        duration: 1000,
+        ease: 'Quad.easeOut',
+        onComplete: () => {
+          shockwave.destroy();
+        }
+      });
+      
+      // Screen shake for hero deaths
+      this.scene.cameras.main.shake(300, 0.005);
+    }
+    
+    // Emit particles once
+    mainParticles.explode();
+    secondaryParticles.explode();
+    
+    // Auto-destroy the emitters after they're done
+    this.scene.time.delayedCall(1500, () => {
+      mainParticles.destroy();
+      secondaryParticles.destroy();
+    });
+  }
+  
+  /**
+   * Creates a hit impact effect at the target location
+   * Visualizes the actual impact of weapons hitting units
+   */
+  private createHitImpactEffect(x: number, y: number, attackerType: UnitType, defenderType: UnitType): void {
+    // Configure the impact visual based on the attacker type
+    let impactColor = 0xffffff;
+    let impactSize = 15;
+    let impactSpeed = 300;
+    
+    switch (attackerType) {
+      case 'melee':
+        impactColor = 0xff6666; // Red impact
+        impactSize = 15;
+        // Create a slash effect for melee
+        const slashAngle = Math.random() * 360;
+        const slash = this.scene.add.rectangle(x, y, 25, 3, impactColor, 0.8);
+        slash.setAngle(slashAngle);
+        
+        this.scene.tweens.add({
+          targets: slash,
+          scaleX: 1.5,
+          scaleY: 1.5,
+          alpha: 0,
+          angle: slashAngle + 45, // Rotate during animation
+          duration: 200,
+          onComplete: () => {
+            slash.destroy();
+          }
+        });
+        break;
+        
+      case 'ranged':
+        impactColor = 0x99ccff; // Blue impact for arrows
+        impactSize = 10;
+        
+        // Create arrow impact particles
+        const arrowImpact = this.scene.add.particles(x, y, 'particle', {
+          speed: { min: 20, max: 60 },
+          angle: { min: 0, max: 360 },
+          scale: { start: 0.5, end: 0 },
+          lifespan: 300,
+          tint: impactColor,
+          quantity: 10,
+          emitting: false
+        });
+        
+        arrowImpact.explode();
+        
+        this.scene.time.delayedCall(300, () => {
+          arrowImpact.destroy();
+        });
+        break;
+        
+      case 'cavalry':
+        impactColor = 0xffcc00; // Gold impact for cavalry
+        impactSize = 20;
+        impactSpeed = 400;
+        
+        // Create dust cloud for cavalry impact
+        const dustCloud = this.scene.add.particles(x, y, 'particle', {
+          speed: { min: 30, max: 80 },
+          angle: { min: 0, max: 360 },
+          scale: { start: 0.8, end: 0 },
+          lifespan: 500,
+          tint: 0xddddaa,
+          quantity: 15,
+          emitting: false
+        });
+        
+        dustCloud.explode();
+        
+        this.scene.time.delayedCall(500, () => {
+          dustCloud.destroy();
+        });
+        break;
+        
+      case 'hero':
+        impactColor = 0xffff66; // Bright yellow/gold for heroes
+        impactSize = 25;
+        
+        // Create a more dramatic impact for heroes
+        const heroImpact = this.scene.add.circle(x, y, impactSize, impactColor, 0.8);
+        
+        this.scene.tweens.add({
+          targets: heroImpact,
+          scaleX: 2,
+          scaleY: 2,
+          alpha: 0,
+          duration: 350,
+          onComplete: () => {
+            heroImpact.destroy();
+          }
+        });
+        
+        // Add mini shockwave for hero attacks
+        const miniShockwave = this.scene.add.circle(x, y, 5, 0xffffff, 0.5);
+        this.scene.tweens.add({
+          targets: miniShockwave,
+          scaleX: 4,
+          scaleY: 4,
+          alpha: 0,
+          duration: 200,
+          onComplete: () => {
+            miniShockwave.destroy();
+          }
+        });
+        break;
+    }
+    
+    // Common impact circle for all types (with customized properties)
+    const impact = this.scene.add.circle(x, y, impactSize/3, impactColor, 0.7);
+    
+    this.scene.tweens.add({
+      targets: impact,
+      scaleX: 1.5,
+      scaleY: 1.5,
+      alpha: 0,
+      duration: impactSpeed * 0.5,
+      onComplete: () => {
+        impact.destroy();
+      }
     });
   }
   
@@ -325,28 +636,80 @@ export class CombatManager {
    * Creates a visual effect to show counter advantage or weakness
    */
   private createCounterEffectVisual(x: number, y: number, isCounterBonus: boolean): void {
-    // Create a text effect to show counter or weakness
+    // Play the appropriate sound
+    const audioStore = useAudio.getState();
+    if (!audioStore.isMuted) {
+      if (isCounterBonus) {
+        audioStore.playCounterAttack();
+      } else {
+        audioStore.playWeaknessHit();
+      }
+    }
+    
+    // Create a text effect to show counter or weakness with enhanced visual style
     const text = this.scene.add.text(
       x, 
       y - 20, 
       isCounterBonus ? "COUNTER!" : "WEAK!", 
       { 
-        fontSize: "16px", 
+        fontSize: isCounterBonus ? "18px" : "16px", 
         color: isCounterBonus ? "#00ff00" : "#ff0000",
         stroke: "#000000",
-        strokeThickness: 3
+        strokeThickness: 3,
+        fontStyle: 'bold'
       }
     );
     
-    // Animate the text
+    // Set initial scale
+    const initialScale = isCounterBonus ? 1.2 : 1.0;
+    text.setScale(initialScale);
+    
+    // Animate the text with more dramatic effect
     this.scene.tweens.add({
       targets: text,
-      y: y - 50,
+      y: y - 60,
+      scaleX: isCounterBonus ? 1.5 : 0.8,
+      scaleY: isCounterBonus ? 1.5 : 0.8,
       alpha: 0,
-      duration: 1000,
+      duration: 1200,
+      ease: isCounterBonus ? 'Back.easeOut' : 'Cubic.easeOut',
       onComplete: () => {
         text.destroy();
       }
+    });
+    
+    // Add a visual indicator circle that expands outward
+    const circleColor = isCounterBonus ? 0x00ff00 : 0xff0000;
+    const circle = this.scene.add.circle(x, y, 10, circleColor, 0.6);
+    
+    this.scene.tweens.add({
+      targets: circle,
+      scaleX: 3,
+      scaleY: 3,
+      alpha: 0,
+      duration: 800,
+      ease: 'Sine.easeOut',
+      onComplete: () => {
+        circle.destroy();
+      }
+    });
+    
+    // Add small symbol particles that fly outward
+    const particles = this.scene.add.particles(x, y, 'particle', {
+      speed: { min: 30, max: 80 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 0.5, end: 0 },
+      lifespan: 600,
+      blendMode: 'ADD',
+      tint: circleColor,
+      quantity: isCounterBonus ? 15 : 8,
+      emitting: false
+    });
+    
+    particles.explode();
+    
+    this.scene.time.delayedCall(600, () => {
+      particles.destroy();
     });
   }
   
