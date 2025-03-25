@@ -307,11 +307,11 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
       
       if (selectedUnitIds && selectedUnitIds.length > 0) {
         // Get all selected units
-        const selectedUnits = selectedUnitIds.map(id => gameScene.unitManager.getUnit(id)).filter(Boolean);
+        const selectedUnits = selectedUnitIds.map((id: string) => gameScene.unitManager.getUnit(id)).filter(Boolean);
         
         if (ability.id === 'faith-shield' && playerFaction === 'Nephites') {
           // Apply faith shield to selected Stripling Warriors
-          selectedUnits.forEach(unit => {
+          selectedUnits.forEach((unit: any) => {
             if (unit.type === 'striplingWarrior') {
               unit.hasFaithShield = true;
               unit.usedFaithShield = false;
@@ -332,7 +332,7 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
         } 
         else if (ability.id === 'stealth' && playerFaction === 'Lamanites') {
           // Apply stealth to selected Lamanite scouts
-          selectedUnits.forEach(unit => {
+          selectedUnits.forEach((unit: any) => {
             if (unit.type === 'lamaniteScout') {
               unit.isStealthed = true;
               

@@ -975,6 +975,142 @@ export class CombatManager {
     });
   }
   
+  /**
+   * Creates a visual effect for the faith shield ability
+   * @param x X position in grid coordinates
+   * @param y Y position in grid coordinates
+   */
+  public createProtectionEffect(x: number, y: number): void {
+    // Play the appropriate sound effect
+    const audioStore = useAudio.getState();
+    if (!audioStore.isMuted && audioStore.successSound) {
+      audioStore.playSuccess();
+    }
+    
+    // Create the shield circle
+    const shield = this.scene.add.circle(
+      x, 
+      y, 
+      TILE_SIZE * 0.6,
+      0x4169E1,
+      0.5
+    );
+    
+    // Add glow effect
+    shield.setStrokeStyle(3, 0x00ffff, 0.8);
+    
+    // Text indicator
+    const shieldText = this.scene.add.text(
+      x,
+      y - 25,
+      "Faith Shield",
+      {
+        fontSize: '12px',
+        color: '#ffffff',
+        stroke: '#000080',
+        strokeThickness: 3
+      }
+    ).setOrigin(0.5);
+    
+    // Add particles for shield effect
+    const particles = this.scene.add.particles(x, y, 'particle', {
+      speed: { min: 20, max: 50 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 0.7, end: 0 },
+      tint: 0x4169E1,
+      lifespan: 1500,
+      quantity: 20,
+      blendMode: Phaser.BlendModes.ADD,
+      emitting: false
+    });
+    
+    // Emit particles
+    particles.explode(20, x, y);
+    
+    // Animate shield expansion and fade
+    this.scene.tweens.add({
+      targets: [shield],
+      scaleX: 1.3,
+      scaleY: 1.3,
+      alpha: 0,
+      duration: 1500,
+      ease: 'Power2',
+      onComplete: () => {
+        shield.destroy();
+      }
+    });
+    
+    // Animate text
+    this.scene.tweens.add({
+      targets: [shieldText],
+      y: shieldText.y - 20,
+      alpha: 0,
+      duration: 1500,
+      onComplete: () => {
+        shieldText.destroy();
+        particles.destroy();
+      }
+    });
+  }
+  
+  /**
+   * Creates a visual effect for the stealth ability
+   * @param x X position in grid coordinates
+   * @param y Y position in grid coordinates
+   */
+  public createStealthEffect(x: number, y: number): void {
+    // Play the appropriate sound effect
+    const audioStore = useAudio.getState();
+    if (!audioStore.isMuted && audioStore.successSound) {
+      audioStore.playSuccess();
+    }
+    
+    // Create smoke particles for stealth effect
+    const particles = this.scene.add.particles(x, y, 'particle', {
+      speed: { min: 10, max: 30 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 0.8, end: 0 },
+      alpha: { start: 0.6, end: 0 },
+      tint: 0x444444,
+      quantity: 25,
+      lifespan: 2000,
+      blendMode: Phaser.BlendModes.SCREEN,
+      emitting: false
+    });
+    
+    // Text indicator
+    const stealthText = this.scene.add.text(
+      x,
+      y - 25,
+      "Stealth",
+      {
+        fontSize: '12px',
+        color: '#cccccc',
+        stroke: '#333333',
+        strokeThickness: 3
+      }
+    ).setOrigin(0.5);
+    
+    // Emit particles
+    particles.explode(25, x, y);
+    
+    // Animate text
+    this.scene.tweens.add({
+      targets: [stealthText],
+      y: stealthText.y - 20,
+      alpha: 0,
+      duration: 1500,
+      onComplete: () => {
+        stealthText.destroy();
+        
+        // Destroy particles after they've finished
+        this.scene.time.delayedCall(2000, () => {
+          particles.destroy();
+        });
+      }
+    });
+  }
+  
   private autoEngageEnemies() {
     const units = this.unitManager.getAllUnits();
     
