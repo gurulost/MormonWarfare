@@ -16,6 +16,7 @@ export class Unit {
   defense: number;
   range: number;
   speed: number;
+  baseSpeed: number; // Store the original speed value
   x: number;
   y: number;
   targetX: number | null;
@@ -28,6 +29,19 @@ export class Unit {
   isGathering: boolean;
   isAttacking: boolean;
   isGatheringAnimationPlaying: boolean;
+  
+  // Faction ability effects
+  defenseMultiplier: number = 1;
+  attackMultiplier: number = 1;
+  speedMultiplier: number = 1;
+  isStealthed: boolean = false;
+  
+  // Special ability for Nephite Stripling Warriors 
+  hasFaithShield: boolean = false;
+  usedFaithShield: boolean = false; // Track if already used
+  
+  // Visual effects for abilities
+  abilityEffects: Map<string, Phaser.GameObjects.Particles.ParticleEmitter> = new Map();
   targetResourceX: number | null;
   targetResourceY: number | null;
   targetUnitId: string | null;
@@ -94,6 +108,18 @@ export class Unit {
     this.defense = stats.defense;
     this.range = stats.range;
     this.speed = stats.speed;
+    this.baseSpeed = stats.speed; // Store original speed for ability calculations
+    
+    // Set special unit properties
+    if (this.type === 'striplingWarrior' && this.faction === 'Nephites') {
+      this.hasFaithShield = true;
+    }
+    
+    if (this.type === 'lamaniteScout' && this.faction === 'Lamanites') {
+      // Scouts move faster and can use stealth
+      this.speed *= 1.2; 
+      this.baseSpeed = this.speed;
+    }
     
     // Create sprite
     this.sprite = this.createSprite(scene);
@@ -569,14 +595,61 @@ export class Unit {
   }
   
   takeDamage(amount: number) {
-    this.health -= Math.max(1, amount - this.defense / 2);
+    // Apply defense multiplier from faction abilities
+    const effectiveDefense = this.defense * this.defenseMultiplier;
+    
+    // Calculate adjusted damage
+    let adjustedDamage = Math.max(1, amount - effectiveDefense / 2);
+    
+    // Special case for Stripling Warriors - they can survive one lethal attack
+    if (this.type === 'striplingWarrior' && this.hasFaithShield && !this.usedFaithShield && 
+        this.health <= adjustedDamage) {
+      // Activate faith shield to survive this attack
+      this.usedFaithShield = true;
+      adjustedDamage = Math.max(0, this.health - 1); // Leave unit with 1 health
+      
+      // Create visual effect for faith shield
+      const scene = this.sprite.scene;
+      const shield = scene.add.circle(0, 0, 25, 0xffffff, 0.7);
+      this.sprite.add(shield);
+      
+      // Add pulsing animation and fade out
+      scene.tweens.add({
+        targets: shield,
+        alpha: 0,
+        scale: 1.5,
+        duration: 1000,
+        onComplete: () => {
+          shield.destroy();
+        }
+      });
+      
+      // Log and play special sound for faith shield
+      console.log(`Stripling Warrior's faith shield activated!`);
+      
+      // Play success sound for faith shield activation
+      const successAudio = document.getElementById('success-sound') as HTMLAudioElement;
+      if (successAudio) {
+        successAudio.currentTime = 0;
+        successAudio.play().catch(e => console.log("Sound play prevented:", e));
+      }
+    }
+    
+    // Apply stealth bonus for Lamanite scouts (reduced damage when stealthed)
+    if (this.type === 'lamaniteScout' && this.isStealthed) {
+      adjustedDamage *= 0.5; // 50% damage reduction when stealthed
+    }
+    
+    // Apply damage
+    this.health -= adjustedDamage;
     
     // Play hit sound if damaged
-    if (amount > 0) {
-      const audioElement = document.getElementById('hit-sound') as HTMLAudioElement;
-      if (audioElement) {
-        audioElement.currentTime = 0;
-        audioElement.play().catch(e => console.log("Sound play prevented:", e));
+    if (adjustedDamage > 0) {
+      // Play appropriate hit sound
+      const hitAudio = document.getElementById('hit-sound') as HTMLAudioElement;
+      if (hitAudio) {
+        hitAudio.currentTime = 0;
+        hitAudio.play().catch(e => console.log("Sound play prevented:", e));
       }
     }
     
