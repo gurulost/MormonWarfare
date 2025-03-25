@@ -32,7 +32,13 @@ import {
   Grid3x3,
   HelpCircle,
   Zap,
-  BookOpen
+  BookOpen,
+  Cog, 
+  Star,
+  GanttChart,
+  Code2,
+  Wheat,
+  Coins
 } from "lucide-react";
 
 // Add global type definition for gameInstance for TypeScript compatibility
@@ -683,6 +689,292 @@ const NotificationMessage: React.FC<{ message: string; type: 'info' | 'warning' 
   );
 };
 
+// Category type for technology organization
+type CategoryType = "military" | "economy" | "defense" | "special";
+
+// Determine the category of a technology based on its effects and ID
+function getTechCategory(tech: any): CategoryType {
+  // Check faction-specific special techs first
+  if (tech.faction && (tech.id.includes("Title") || tech.id.includes("Record") || 
+      tech.id.includes("Alliance") || tech.id.includes("Prophecy"))) {
+    return "special";
+  }
+  
+  // Check defense technologies
+  if (tech.id.includes("fortification") || 
+      tech.id.includes("defense") || 
+      tech.id.includes("wall") ||
+      (tech.effects && (tech.effects.defense || tech.effects.buildingDefense))) {
+    return "defense";
+  }
+  
+  // Check economy technologies
+  if (tech.id.includes("agriculture") || 
+      tech.id.includes("mining") || 
+      tech.id.includes("economy") || 
+      tech.id.includes("resources") ||
+      (tech.effects && (tech.effects.foodGatherRate || tech.effects.oreGatherRate))) {
+    return "economy";
+  }
+  
+  // Default to military
+  return "military";
+}
+
+// Enhanced Tech Tree Component
+interface EnhancedTechTreeProps {
+  techs: any[];
+  onResearch: (techId: string) => void;
+  playerFaction: string;
+  notifyUser: (message: string, type: string) => void;
+  color: string;
+}
+
+const EnhancedTechTree: React.FC<EnhancedTechTreeProps> = ({ 
+  techs, 
+  onResearch, 
+  playerFaction, 
+  notifyUser,
+  color 
+}) => {
+  // Calculate tech tiers based on prerequisites
+  const techTiers: Record<string, number> = {};
+  
+  // First pass: set initial tiers
+  techs.forEach(tech => {
+    if (!tech.prerequisites || tech.prerequisites.length === 0) {
+      techTiers[tech.id] = 0; // Base tier (no prerequisites)
+    } else {
+      techTiers[tech.id] = -1; // Not yet calculated
+    }
+  });
+  
+  // Additional passes to resolve dependencies
+  let changed = true;
+  while (changed) {
+    changed = false;
+    techs.forEach(tech => {
+      if (techTiers[tech.id] === -1) {
+        // Check if all prerequisites have been assigned a tier
+        const prereqTiers = tech.prerequisites
+          .map((prereqId: string) => techTiers[prereqId])
+          .filter((tier: number) => tier !== undefined && tier >= 0);
+        
+        if (prereqTiers.length === tech.prerequisites.length) {
+          // All prerequisites have tiers, set this tech's tier
+          const maxPrereqTier = Math.max(...prereqTiers);
+          techTiers[tech.id] = maxPrereqTier + 1;
+          changed = true;
+        }
+      }
+    });
+  }
+  
+  // Group techs by tier
+  const techsByTier: Record<number, any[]> = {};
+  techs.forEach(tech => {
+    const tier = techTiers[tech.id] !== undefined ? techTiers[tech.id] : 0;
+    if (!techsByTier[tier]) {
+      techsByTier[tier] = [];
+    }
+    techsByTier[tier].push(tech);
+  });
+  
+  return (
+    <div className="flex flex-col gap-4 p-2">
+      {Object.entries(techsByTier).map(([tier, tierTechs]) => (
+        <div key={tier} className="relative">
+          {/* Tech tier label */}
+          <div 
+            className="absolute -left-2 top-1/2 transform -translate-y-1/2 -rotate-90 text-xs text-gray-400 origin-center"
+            style={{ width: 'auto', whiteSpace: 'nowrap' }}
+          >
+            Tier {parseInt(tier) + 1}
+          </div>
+          
+          {/* Tech nodes for this tier */}
+          <div className="flex gap-3 ml-5">
+            {tierTechs.map(tech => (
+              <TechCard 
+                key={tech.id} 
+                tech={tech} 
+                onResearch={onResearch} 
+                playerFaction={playerFaction} 
+                notifyUser={notifyUser}
+                color={color}
+                tier={parseInt(tier)}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// Tech Card Component
+interface TechCardProps {
+  tech: any;
+  onResearch: (techId: string) => void;
+  playerFaction: string;
+  notifyUser: (message: string, type: string) => void;
+  color: string;
+  tier: number;
+}
+
+const TechCard: React.FC<TechCardProps> = ({ 
+  tech, 
+  onResearch, 
+  playerFaction, 
+  notifyUser,
+  color,
+  tier
+}) => {
+  const available = tech.faction === playerFaction || !tech.faction;
+  const prereqsMet = !tech.prerequisites || tech.prerequisites.length === 0 || 
+                     tech.prerequisites.every((prereqId: string) => {
+                       // In a real implementation, check if the prerequisite is researched
+                       return true; // For now, assume all prerequisites are met
+                     });
+  
+  // Determine background and border colors based on research status
+  const getBgColor = () => {
+    if (tech.researched) return 'bg-gray-700/50';
+    if (!available) return 'bg-gray-800/30';
+    if (!prereqsMet) return 'bg-gray-800/50';
+    return `bg-${color.replace('#', '')}/10`;
+  };
+  
+  const getBorderColor = () => {
+    if (tech.researched) return 'border-gray-600';
+    if (!available) return 'border-gray-700';
+    if (!prereqsMet) return 'border-gray-700';
+    return `border-${color.replace('#', '')}/50`;
+  };
+  
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="cursor-pointer relative"
+          >
+            <Card 
+              className={`p-3 w-36 min-h-[7rem] border ${getBorderColor()} ${getBgColor()} transition-colors
+                          ${!available ? 'opacity-50' : ''}`}
+              onClick={() => {
+                if (available && !tech.researched && prereqsMet) {
+                  onResearch(tech.id);
+                  notifyUser(`Researching ${tech.name}`, "success");
+                } else if (!prereqsMet) {
+                  notifyUser("Prerequisites not met", "warning");
+                } else if (tech.researched) {
+                  notifyUser("Already researched", "info");
+                }
+              }}
+            >
+              <div className="text-center relative">
+                {/* Research status indicator */}
+                {tech.researched && (
+                  <div className="absolute -top-2 -right-2 bg-green-600 text-white rounded-full p-0.5">
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      width="12" 
+                      height="12" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      strokeWidth="2" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round"
+                    >
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  </div>
+                )}
+                
+                {/* Faction-specific indicator */}
+                {tech.faction && (
+                  <div className="absolute -top-1 -left-1 rounded-sm px-1 text-[0.6rem]" style={{
+                    backgroundColor: tech.faction === 'Nephites' ? '#4287f5' : '#f54242',
+                    color: 'white'
+                  }}>
+                    {tech.faction.substring(0, 3)}
+                  </div>
+                )}
+                
+                <h3 className="font-semibold text-sm line-clamp-1">{tech.name}</h3>
+                <p className="text-xs my-1 line-clamp-2 h-8">{tech.description}</p>
+                
+                {/* Resource cost */}
+                <div className="flex justify-between text-xs opacity-75 mt-1">
+                  <span className="flex items-center">
+                    <TreePine className="w-3 h-3 mr-1" />
+                    {tech.cost.food}
+                  </span>
+                  <span className="flex items-center">
+                    <Mountain className="w-3 h-3 mr-1" />
+                    {tech.cost.ore}
+                  </span>
+                </div>
+                
+                {/* Unlocks indicator */}
+                {tech.unlocks && (
+                  (tech.unlocks.units?.length > 0 || tech.unlocks.buildings?.length > 0) && (
+                    <div className="mt-1 text-xs bg-blue-900/30 rounded px-1 py-0.5 line-clamp-1">
+                      Unlocks {tech.unlocks.units?.length || 0 + tech.unlocks.buildings?.length || 0} items
+                    </div>
+                  )
+                )}
+              </div>
+            </Card>
+          </motion.div>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="bg-gray-900 text-white w-64">
+          <div className="p-2">
+            <h4 className="font-bold">{tech.name}</h4>
+            <p className="text-xs my-1">{tech.description}</p>
+            
+            {tech.effects && Object.keys(tech.effects).length > 0 && (
+              <div className="mt-2">
+                <p className="text-xs font-semibold">Effects:</p>
+                <ul className="text-xs list-disc pl-4">
+                  {Object.entries(tech.effects).map(([key, value]) => (
+                    <li key={key}>{key}: {String(value)}</li>
+                  )) as React.ReactNode}
+                </ul>
+              </div>
+            )}
+            
+            {tech.unlocks && (
+              <div className="mt-2">
+                <p className="text-xs font-semibold">Unlocks:</p>
+                <ul className="text-xs list-disc pl-4">
+                  {tech.unlocks.units && tech.unlocks.units.map((unit: any) => (
+                    <li key={unit}>Unit: {unit}</li>
+                  ))}
+                  {tech.unlocks.buildings && tech.unlocks.buildings.map((building: any) => (
+                    <li key={building}>Building: {building}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            
+            {tech.prerequisites && tech.prerequisites.length > 0 && (
+              <div className="mt-2">
+                <p className="text-xs font-semibold">Requires:</p>
+                <p className="text-xs">{tech.prerequisites.join(', ')}</p>
+              </div>
+            )}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+};
+
 // Main game HUD component
 export const GameHUD: React.FC<{
   resources: ResourceData;
@@ -1268,92 +1560,107 @@ export const GameHUD: React.FC<{
 
           {/* Technology Tab Content */}
           <TabsContent value="tech" className="mt-0">
-            <ScrollArea className="h-40">
-              <div className="grid grid-cols-3 gap-3 p-2">
-                {availableTechs.map((tech, index) => (
-                  <TooltipProvider key={tech.id}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <motion.div
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          className="cursor-pointer"
-                        >
-                          <Card 
-                            className={`p-3 hover:bg-gray-600/50 ${
-                              tech.faction === playerFaction || !tech.faction
-                                ? 'bg-gray-700/50'
-                                : 'bg-gray-800/30 opacity-50'
-                            }`}
-                            onClick={() => {
-                              if (tech.faction === playerFaction || !tech.faction) {
-                                onResearchTech(tech.id);
-                                addNotification(`Researching ${tech.name}`, "success");
-                              }
-                            }}
-                          >
-                            <div className="text-center">
-                              <h3 className="font-semibold">{tech.name}</h3>
-                              <p className="text-xs my-1 line-clamp-2">{tech.description}</p>
-                              <div className="flex justify-between text-xs opacity-75 mt-2">
-                                <span>Food: {tech.cost.food}</span>
-                                <span>Ore: {tech.cost.ore}</span>
-                              </div>
-                              {tech.faction && (
-                                <span className="text-xs inline-block mt-1 px-2 py-0.5 rounded" style={{
-                                  backgroundColor: tech.faction === 'Nephites' ? '#4287f5' : '#f54242',
-                                  color: 'white'
-                                }}>
-                                  {tech.faction}
-                                </span>
-                              )}
-                            </div>
-                          </Card>
-                        </motion.div>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="bg-gray-900 text-white">
-                        <div className="p-2 max-w-md">
-                          <h4 className="font-bold">{tech.name}</h4>
-                          <p className="text-xs my-1">{tech.description}</p>
-                          
-                          {tech.effects && Object.keys(tech.effects).length > 0 && (
-                            <div className="mt-2">
-                              <p className="text-xs font-semibold">Effects:</p>
-                              <ul className="text-xs list-disc pl-4">
-                                {Object.entries(tech.effects).map(([key, value]) => (
-                                  <li key={key}>{key}: {String(value)}</li>
-                                )) as React.ReactNode}
-                              </ul>
-                            </div>
-                          )}
-                          
-                          {tech.unlocks && (
-                            <div className="mt-2">
-                              <p className="text-xs font-semibold">Unlocks:</p>
-                              <ul className="text-xs list-disc pl-4">
-                                {tech.unlocks.units && tech.unlocks.units.map((unit: any) => (
-                                  <li key={unit}>Unit: {unit}</li>
-                                ))}
-                                {tech.unlocks.buildings && tech.unlocks.buildings.map((building: any) => (
-                                  <li key={building}>Building: {building}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                          
-                          {tech.prerequisites && tech.prerequisites.length > 0 && (
-                            <div className="mt-2">
-                              <p className="text-xs font-semibold">Requires:</p>
-                              <p className="text-xs">{tech.prerequisites.join(', ')}</p>
-                            </div>
-                          )}
-                        </div>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                ))}
-              </div>
-            </ScrollArea>
+            <div className="h-40 flex flex-col">
+              {/* Tech Tree Category Tabs */}
+              <Tabs defaultValue="military" className="w-full mb-1">
+                <div className="border-b border-gray-700">
+                  <TabsList className="bg-transparent h-8 mb-0">
+                    <TabsTrigger 
+                      value="military" 
+                      className="h-8 px-3 text-xs data-[state=active]:bg-red-900/40 data-[state=active]:border-b-2 data-[state=active]:border-red-500"
+                    >
+                      <Sword className="w-3 h-3 mr-1" />
+                      Military
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="economy" 
+                      className="h-8 px-3 text-xs data-[state=active]:bg-green-900/40 data-[state=active]:border-b-2 data-[state=active]:border-green-500"
+                    >
+                      <Wheat className="w-3 h-3 mr-1" />
+                      Economy
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="defense" 
+                      className="h-8 px-3 text-xs data-[state=active]:bg-blue-900/40 data-[state=active]:border-b-2 data-[state=active]:border-blue-500"
+                    >
+                      <Shield className="w-3 h-3 mr-1" />
+                      Defense
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="special" 
+                      className="h-8 px-3 text-xs data-[state=active]:bg-purple-900/40 data-[state=active]:border-b-2 data-[state=active]:border-purple-500"
+                    >
+                      <Star className="w-3 h-3 mr-1" />
+                      Special
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
+                
+                {/* Military Tech Tree */}
+                <TabsContent value="military" className="p-0 m-0 border-none">
+                  <div className="text-xs px-2 py-1 italic text-gray-400 bg-red-950/30 rounded mb-1">
+                    Military technologies enhance your offensive capabilities. Focusing here allows for a more aggressive playstyle.
+                  </div>
+                  <ScrollArea className="h-[6.5rem]">
+                    <EnhancedTechTree 
+                      techs={availableTechs.filter((tech: any) => getTechCategory(tech) === 'military')}
+                      onResearch={onResearchTech}
+                      playerFaction={playerFaction}
+                      notifyUser={addNotification}
+                      color="#b92d2d"
+                    />
+                  </ScrollArea>
+                </TabsContent>
+                
+                {/* Economy Tech Tree */}
+                <TabsContent value="economy" className="p-0 m-0 border-none">
+                  <div className="text-xs px-2 py-1 italic text-gray-400 bg-green-950/30 rounded mb-1">
+                    Economic technologies improve resource gathering and efficiency. Critical for sustained warfare and expansion.
+                  </div>
+                  <ScrollArea className="h-[6.5rem]">
+                    <EnhancedTechTree 
+                      techs={availableTechs.filter((tech: any) => getTechCategory(tech) === 'economy')}
+                      onResearch={onResearchTech}
+                      playerFaction={playerFaction} 
+                      notifyUser={addNotification}
+                      color="#2d8a36"
+                    />
+                  </ScrollArea>
+                </TabsContent>
+                
+                {/* Defense Tech Tree */}
+                <TabsContent value="defense" className="p-0 m-0 border-none">
+                  <div className="text-xs px-2 py-1 italic text-gray-400 bg-blue-950/30 rounded mb-1">
+                    Defensive technologies strengthen your buildings and fortifications. Essential for holding territory.
+                  </div>
+                  <ScrollArea className="h-[6.5rem]">
+                    <EnhancedTechTree 
+                      techs={availableTechs.filter((tech: any) => getTechCategory(tech) === 'defense')}
+                      onResearch={onResearchTech}
+                      playerFaction={playerFaction}
+                      notifyUser={addNotification}
+                      color="#3d6fa3"
+                    />
+                  </ScrollArea>
+                </TabsContent>
+                
+                {/* Special Tech Tree */}
+                <TabsContent value="special" className="p-0 m-0 border-none">
+                  <div className="text-xs px-2 py-1 italic text-gray-400 bg-purple-950/30 rounded mb-1">
+                    Faction-specific technologies that provide unique advantages based on your civilization's strengths.
+                  </div>
+                  <ScrollArea className="h-[6.5rem]">
+                    <EnhancedTechTree 
+                      techs={availableTechs.filter((tech: any) => getTechCategory(tech) === 'special')}
+                      onResearch={onResearchTech}
+                      playerFaction={playerFaction}
+                      notifyUser={addNotification}
+                      color="#8a2d8a"
+                    />
+                  </ScrollArea>
+                </TabsContent>
+              </Tabs>
+            </div>
           </TabsContent>
 
           {/* Selected Units/Buildings Tab Content - Enhanced with more contextual details */}
