@@ -35,6 +35,13 @@ import {
   BookOpen
 } from "lucide-react";
 
+// Add global type definition for gameInstance for TypeScript compatibility
+declare global {
+  interface Window {
+    gameInstance?: any;
+  }
+}
+
 interface ResourceData {
   food: number;
   ore: number;
@@ -63,6 +70,37 @@ const MiniMap: React.FC<MiniMapProps> = ({
   onClick 
 }) => {
   const mapCanvasRef = React.useRef<HTMLCanvasElement>(null);
+  const [showGrid, setShowGrid] = useState(false);
+  const [pingPosition, setPingPosition] = useState<{x: number, y: number, alpha: number} | null>(null);
+  const [pingHistory, setPingHistory] = useState<{x: number, y: number, timestamp: number, player?: string}[]>([]);
+  const [rightClickMenuPosition, setRightClickMenuPosition] = useState<{x: number, y: number, mapX: number, mapY: number} | null>(null);
+  
+  // Auto-fade pings
+  useEffect(() => {
+    if (pingPosition) {
+      const interval = setInterval(() => {
+        setPingPosition(prev => {
+          if (!prev) return null;
+          if (prev.alpha <= 0.1) return null;
+          return {...prev, alpha: prev.alpha - 0.1};
+        });
+      }, 100);
+      
+      return () => clearInterval(interval);
+    }
+  }, [pingPosition]);
+  
+  // Clean up old pings
+  useEffect(() => {
+    if (pingHistory.length > 0) {
+      const interval = setInterval(() => {
+        const now = Date.now();
+        setPingHistory(prev => prev.filter(ping => now - ping.timestamp < 5000));
+      }, 500);
+      
+      return () => clearInterval(interval);
+    }
+  }, [pingHistory]);
   
   // Draw map and units on canvas
   useEffect(() => {
@@ -107,6 +145,28 @@ const MiniMap: React.FC<MiniMapProps> = ({
             );
           }
         }
+      }
+    }
+    
+    // Draw grid if enabled
+    if (showGrid) {
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.lineWidth = 0.5;
+      
+      for (let x = 0; x <= mapSize; x++) {
+        const pixelX = x * tileSize;
+        ctx.beginPath();
+        ctx.moveTo(pixelX, 0);
+        ctx.lineTo(pixelX, canvas.height);
+        ctx.stroke();
+      }
+      
+      for (let y = 0; y <= mapSize; y++) {
+        const pixelY = y * tileSize;
+        ctx.beginPath();
+        ctx.moveTo(0, pixelY);
+        ctx.lineTo(canvas.width, pixelY);
+        ctx.stroke();
       }
     }
     
@@ -159,10 +219,69 @@ const MiniMap: React.FC<MiniMapProps> = ({
       );
     }
     
-  }, [mapData, mapSize, units, buildings, playerFaction, localPlayerId, cameraPosition]);
+    // Draw active ping
+    if (pingPosition) {
+      // Draw ping animation
+      const { x, y, alpha } = pingPosition;
+      const pingSize = 12;
+      
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      
+      // Outer ring
+      ctx.beginPath();
+      ctx.arc(x, y, pingSize, 0, Math.PI * 2);
+      ctx.strokeStyle = '#ffcc00';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Inner dot
+      ctx.beginPath();
+      ctx.arc(x, y, pingSize/3, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffcc00';
+      ctx.fill();
+      
+      ctx.restore();
+    }
+    
+    // Draw recent pings history
+    if (pingHistory.length > 0) {
+      pingHistory.forEach(ping => {
+        const timeElapsed = Date.now() - ping.timestamp;
+        const alpha = Math.max(0, 1 - (timeElapsed / 5000));
+        const pingX = ping.x / mapSize * canvas.width;
+        const pingY = ping.y / mapSize * canvas.width;
+        
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        
+        // Outer ring
+        ctx.beginPath();
+        ctx.arc(pingX, pingY, 8, 0, Math.PI * 2);
+        ctx.strokeStyle = ping.player === localPlayerId ? '#00ffff' : '#ff9900';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // Inner dot
+        ctx.beginPath();
+        ctx.arc(pingX, pingY, 3, 0, Math.PI * 2);
+        ctx.fillStyle = ping.player === localPlayerId ? '#00ffff' : '#ff9900';
+        ctx.fill();
+        
+        ctx.restore();
+      });
+    }
+    
+  }, [mapData, mapSize, units, buildings, playerFaction, localPlayerId, cameraPosition, showGrid, pingPosition, pingHistory]);
   
   // Handle minimap clicks to move camera
   const handleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // Close right-click menu if it's open
+    if (rightClickMenuPosition) {
+      setRightClickMenuPosition(null);
+      return;
+    }
+    
     const canvas = mapCanvasRef.current;
     if (!canvas) return;
     
@@ -175,12 +294,98 @@ const MiniMap: React.FC<MiniMapProps> = ({
     const mapX = Math.floor((x / canvas.width) * mapSize);
     const mapY = Math.floor((y / canvas.height) * mapSize);
     
+    // Create ping animation at click point
+    setPingPosition({
+      x: x,
+      y: y,
+      alpha: 1.0
+    });
+    
+    // Add to ping history for multiplayer
+    setPingHistory(prev => [
+      ...prev, 
+      {
+        x: mapX,
+        y: mapY,
+        timestamp: Date.now(),
+        player: localPlayerId
+      }
+    ]);
+    
     // Trigger click handler
     onClick(mapX, mapY);
   };
   
+  // Handle right-click for context menu
+  const handleRightClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    
+    const canvas = mapCanvasRef.current;
+    if (!canvas) return;
+    
+    // Get click position relative to canvas
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Convert to map coordinates
+    const mapX = Math.floor((x / canvas.width) * mapSize);
+    const mapY = Math.floor((y / canvas.height) * mapSize);
+    
+    // Show context menu
+    setRightClickMenuPosition({
+      x: x,
+      y: y,
+      mapX: mapX,
+      mapY: mapY
+    });
+  };
+  
+  // Handle command from right-click menu
+  const handleCommand = (command: string) => {
+    if (!rightClickMenuPosition) return;
+    
+    const { mapX, mapY } = rightClickMenuPosition;
+    
+    // Create ping animation at command point
+    setPingPosition({
+      x: rightClickMenuPosition.x,
+      y: rightClickMenuPosition.y,
+      alpha: 1.0
+    });
+    
+    // Add to ping history for multiplayer with command type
+    setPingHistory(prev => [
+      ...prev, 
+      {
+        x: mapX,
+        y: mapY,
+        timestamp: Date.now(),
+        player: localPlayerId
+      }
+    ]);
+    
+    // Dispatch command based on type
+    const phaserEvents = window.gameInstance?.registry.get('reactEvents');
+    
+    if (command === 'move') {
+      onClick(mapX, mapY); // Use the existing click handler for basic move
+    } else if (command === 'attack') {
+      // Additional command for attack-move
+      const customEvent = new CustomEvent('minimapAttackMove', { 
+        detail: { x: mapX, y: mapY } 
+      });
+      document.dispatchEvent(customEvent);
+    } else if (command === 'ping') {
+      // Just keep the ping visual, no additional command
+    }
+    
+    // Close menu
+    setRightClickMenuPosition(null);
+  };
+  
   return (
-    <div className="bg-black/60 backdrop-blur-sm p-1 rounded-md shadow-lg overflow-hidden">
+    <div className="bg-black/60 backdrop-blur-sm p-1 rounded-md shadow-lg overflow-hidden relative">
       <div className="flex items-center justify-between mb-1 px-1">
         <div className="text-xs font-bold text-white/80 flex items-center">
           <MapIcon size={12} className="mr-1" /> Minimap
@@ -188,8 +393,13 @@ const MiniMap: React.FC<MiniMapProps> = ({
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-5 w-5">
-                <Grid3x3 size={10} className="text-white/80" />
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-5 w-5"
+                onClick={() => setShowGrid(!showGrid)}
+              >
+                <Grid3x3 size={10} className={`${showGrid ? 'text-white' : 'text-white/60'}`} />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="left">
@@ -198,14 +408,55 @@ const MiniMap: React.FC<MiniMapProps> = ({
           </Tooltip>
         </TooltipProvider>
       </div>
+      
       <canvas 
         ref={mapCanvasRef} 
         width={150} 
         height={150} 
         className="rounded-sm cursor-pointer"
         onClick={handleClick}
+        onContextMenu={handleRightClick}
         aria-label="Game minimap - click to navigate"
       />
+      
+      {/* Right-click context menu */}
+      {rightClickMenuPosition && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="absolute bg-gray-900/90 backdrop-blur-sm border border-gray-700 rounded text-white text-xs z-50 overflow-hidden"
+          style={{
+            left: rightClickMenuPosition.x,
+            top: rightClickMenuPosition.y,
+          }}
+        >
+          <div className="flex flex-col">
+            <button 
+              className="px-3 py-1.5 text-left hover:bg-blue-700/50 flex items-center whitespace-nowrap"
+              onClick={() => handleCommand('move')}
+            >
+              <svg className="w-3 h-3 mr-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
+              Move here
+            </button>
+            <button 
+              className="px-3 py-1.5 text-left hover:bg-red-700/50 flex items-center whitespace-nowrap"
+              onClick={() => handleCommand('attack')}
+            >
+              <Sword className="w-3 h-3 mr-1.5" />
+              Attack-move here
+            </button>
+            <button 
+              className="px-3 py-1.5 text-left hover:bg-yellow-700/50 flex items-center whitespace-nowrap"
+              onClick={() => handleCommand('ping')}
+            >
+              <Zap className="w-3 h-3 mr-1.5" />
+              Ping
+            </button>
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 };
