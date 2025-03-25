@@ -2,6 +2,9 @@ import Phaser from "phaser";
 import { UnitType, FactionType } from "../types";
 import { TILE_SIZE } from "../config";
 
+// Define possible unit stances
+export type UnitStance = 'aggressive' | 'defensive' | 'hold-position' | 'stand-ground';
+
 export class Unit {
   id: string;
   type: UnitType;
@@ -32,6 +35,18 @@ export class Unit {
   gatheringEfficiency: number; // Faction-specific bonus
   resourceIndicator: Phaser.GameObjects.Shape | null = null;
   resourceAmountText: Phaser.GameObjects.Text | null = null;
+  
+  // Enhanced unit control properties
+  stance: UnitStance = 'defensive'; // Default stance
+  stanceIndicator: Phaser.GameObjects.Text | null = null;
+  isPatrolling: boolean = false;
+  patrolStartX: number | null = null;
+  patrolStartY: number | null = null;
+  patrolEndX: number | null = null;
+  patrolEndY: number | null = null;
+  isAttackMoving: boolean = false;
+  attackMoveTargetX: number | null = null;
+  attackMoveTargetY: number | null = null;
   
   // Client-side prediction properties
   isPredicted: boolean = false;
@@ -342,11 +357,20 @@ export class Unit {
     return stats;
   }
   
+
+  
   update(delta: number) {
     // Update health bar
     const healthPercent = this.health / this.maxHealth;
     this.healthBar.width = 30 * healthPercent;
     this.healthBar.fillColor = healthPercent > 0.5 ? 0x00ff00 : 0xff0000;
+    
+    // Handle special movement modes
+    if (this.isPatrolling && !this.isMoving) {
+      this.handlePatrolMovement();
+    } else if (this.isAttackMoving && !this.isAttacking) {
+      this.handleAttackMoveCheck();
+    }
     
     // Find the text symbol in the container
     let unitSymbol: Phaser.GameObjects.Text | null = null;
@@ -707,6 +731,161 @@ export class Unit {
       this.predictionSprite.clear();
       this.predictionSprite.destroy();
       this.predictionSprite = null;
+    }
+  }
+  
+  /**
+   * Set the unit's stance which affects its combat behavior
+   * @param stance New stance for the unit
+   */
+  setStance(stance: UnitStance) {
+    this.stance = stance;
+    
+    // Update visual indicator
+    this.updateStanceIndicator();
+    
+    console.log(`Unit ${this.id} stance set to ${stance}`);
+  }
+  
+  /**
+   * Update the visual indicator showing the unit's current stance
+   */
+  private updateStanceIndicator() {
+    // Remove existing stance indicator if it exists
+    if (this.stanceIndicator) {
+      this.stanceIndicator.destroy();
+      this.stanceIndicator = null;
+    }
+    
+    // Create new stance indicator
+    const scene = this.sprite.scene;
+    
+    // Stance indicator styles based on stance type
+    const stanceSymbol = {
+      'aggressive': 'A',
+      'defensive': 'D',
+      'hold-position': 'H',
+      'stand-ground': 'S'
+    }[this.stance];
+    
+    const stanceColor = {
+      'aggressive': '#ff0000',
+      'defensive': '#00ffff',
+      'hold-position': '#ffff00',
+      'stand-ground': '#888888'
+    }[this.stance];
+    
+    // Create the indicator at the bottom of the unit
+    this.stanceIndicator = scene.add.text(0, 18, stanceSymbol, {
+      fontSize: '10px',
+      fontFamily: 'monospace',
+      color: stanceColor,
+      stroke: '#000000',
+      strokeThickness: 1,
+      backgroundColor: '#00000088'
+    }).setOrigin(0.5);
+    
+    // Add to unit's container
+    this.sprite.add(this.stanceIndicator);
+  }
+  
+  /**
+   * Set patrol points for this unit
+   * @param startX Starting patrol point X
+   * @param startY Starting patrol point Y
+   * @param endX Ending patrol point X
+   * @param endY Ending patrol point Y
+   */
+  startPatrol(startX: number, startY: number, endX: number, endY: number) {
+    this.isPatrolling = true;
+    this.patrolStartX = startX;
+    this.patrolStartY = startY;
+    this.patrolEndX = endX;
+    this.patrolEndY = endY;
+    
+    // Initially move to the end point
+    this.setPath([{ x: endX, y: endY }]);
+    
+    console.log(`Unit ${this.id} patrolling between (${startX},${startY}) and (${endX},${endY})`);
+  }
+  
+  /**
+   * Stop patrolling
+   */
+  stopPatrol() {
+    this.isPatrolling = false;
+    this.patrolStartX = null;
+    this.patrolStartY = null;
+    this.patrolEndX = null;
+    this.patrolEndY = null;
+  }
+  
+  /**
+   * Handle patrol movement logic
+   * When one patrol point is reached, move to the other
+   */
+  private handlePatrolMovement() {
+    if (!this.isPatrolling || !this.patrolStartX || !this.patrolStartY || 
+        !this.patrolEndX || !this.patrolEndY) {
+      return;
+    }
+    
+    // Determine which patrol point to move to next
+    const currentX = Math.floor(this.x / TILE_SIZE);
+    const currentY = Math.floor(this.y / TILE_SIZE);
+    
+    // If we're at or near the end point, go to start point
+    if (Math.abs(currentX - this.patrolEndX) <= 1 && Math.abs(currentY - this.patrolEndY) <= 1) {
+      this.setPath([{ x: this.patrolStartX, y: this.patrolStartY }]);
+    } 
+    // If we're at or near the start point, go to end point
+    else if (Math.abs(currentX - this.patrolStartX) <= 1 && Math.abs(currentY - this.patrolStartY) <= 1) {
+      this.setPath([{ x: this.patrolEndX, y: this.patrolEndY }]);
+    }
+  }
+  
+  /**
+   * Start attack-move to a position
+   * Unit will move to the position while attacking any enemy encountered
+   */
+  startAttackMove(targetX: number, targetY: number) {
+    this.isAttackMoving = true;
+    this.attackMoveTargetX = targetX;
+    this.attackMoveTargetY = targetY;
+    
+    // Set path to the target location
+    this.setPath([{ x: targetX, y: targetY }]);
+    
+    console.log(`Unit ${this.id} attack-moving to (${targetX},${targetY})`);
+  }
+  
+  /**
+   * Stop attack-move
+   */
+  stopAttackMove() {
+    this.isAttackMoving = false;
+    this.attackMoveTargetX = null;
+    this.attackMoveTargetY = null;
+  }
+  
+  /**
+   * Check for enemies while performing attack-move
+   * This should be called by the CombatManager to scan for enemies
+   */
+  private handleAttackMoveCheck() {
+    // This will be filled by CombatManager logic to scan for enemies
+    // and engage them if found based on the unit's stance and attack range
+    if (!this.isAttackMoving) return;
+    
+    // If we've reached our attack-move destination, stop attack-moving
+    const currentX = Math.floor(this.x / TILE_SIZE);
+    const currentY = Math.floor(this.y / TILE_SIZE);
+    
+    if (this.attackMoveTargetX !== null && this.attackMoveTargetY !== null) {
+      if (Math.abs(currentX - this.attackMoveTargetX) <= 1 && 
+          Math.abs(currentY - this.attackMoveTargetY) <= 1) {
+        this.stopAttackMove();
+      }
     }
   }
 }
