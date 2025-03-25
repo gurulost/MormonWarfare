@@ -1,0 +1,29 @@
+High-Impact Issues & Fixes:
+
+Client-Side Polling for UI Updates:
+Issue: GameIntegration.tsx uses setInterval(updateGameData, 500) to poll the Phaser GameScene for state changes (resources, selection, map data, etc.). This is inefficient, can lead to noticeable lag between game actions and UI updates, and misses transient events.
+Fix: Replace polling with an event-driven approach. Utilize the phaserEvents EventTarget already set up in GameContainer.tsx and registered in the Phaser game registry. Have Phaser managers (ResourceManager, UnitManager, BuildingManager, etc.) dispatch specific custom events whenever state changes (e.g., resourcesUpdated, unitSelected, buildingQueueChanged). GameIntegration.tsx should listen for these events and update its React state accordingly. This provides immediate UI feedback.
+Global Camera Controls Dependency:
+Issue: The CameraController.tsx (and by extension EnhancedGameScene.tsx and potentially GameOverlay.tsx) relies on setting window.cameraControls globally. GameIntegration.tsx then calls methods on this global object. This is fragile, prone to race conditions (if the controls aren't set yet), makes testing difficult, and isn't good practice.
+Fix: Refactor CameraController.tsx to return its control methods via a ref or pass them up through props/context. EnhancedGameScene should manage its CameraController instance and expose controls upwards. GameIntegration can then hold a reference to these controls or receive them via props/context to mediate between the GameHUD buttons and the 3D camera logic, removing the global dependency.
+Basic Multiplayer State Reconciliation & Prediction:
+Issue: The current client-side prediction (unit.setPredicted, unit.clearPrediction) and server reconciliation in useMultiplayer.ts / GameRoom.ts seem basic. Filtering pending actions based mainly on timestamps (action.timestamp > timestamp - 500) is not robust enough to handle varying network latency, packet loss, or out-of-order events correctly. This is a major risk for desynchronization in multiplayer. The actionId check seems limited to movement.
+Fix: Implement a more robust reconciliation strategy.
+Server: Send reliable, sequenced state snapshots or delta updates along with the server tick number. Acknowledge processed client actionIds definitively in state updates.
+Client: Store unacknowledged client actions with their actionId and timestamp. When a server update arrives, revert client state to the last acknowledged server state, then re-apply only the unacknowledged client actions that occurred after that server state's timestamp. Correct predicted unit positions based on the authoritative server state if discrepancies exceed a threshold.
+Building Selection and Interaction Flow:
+Issue: Unit selection (setupSelectionEvents in GameScene.ts, selectUnitsInBounds, selectUnitAtPosition) appears more developed than building selection. The logic in pointerup tries to handle building clicks, but it's mixed with unit selection and might be unreliable, especially with overlapping entities. The UI (gameHUD.tsx) lacks a clear display for selected building details and production queues.
+Fix:
+Phaser: Implement dedicated building selection logic in GameScene.ts, potentially using Phaser's input detection on building sprites/containers. Fire a specific buildingSelected event.
+React: Update GameIntegration.tsx to listen for buildingSelected events. Enhance the "Selected" tab in GameHUD.tsx to display building health, owner, and crucially, the production queue (building.productionQueue) with progress bars and cancellation buttons.
+Missing Core RTS Unit Controls:
+Issue: The GDD mentions simple controls, but standard RTS gameplay relies on Attack-Move, Patrol, and Stances for tactical depth. These are currently missing from the core unit logic and UI. Unit.ts has properties/methods (stance, startPatrol, startAttackMove), but they aren't fully integrated or controllable.
+Fix:
+Phaser: Fully implement the logic for these commands within Unit.ts and potentially CombatManager.ts (for attack-move enemy scanning) and UnitManager.ts (for issuing patrol paths).
+React: Add buttons to GameHUD.tsx (likely in the "Selected" tab when military units are selected) to issue these commands (Attack-Move, Patrol, Set Stance). Implement keyboard shortcuts in GameScene.ts for these actions.
+Inefficient Building Placement Feedback:
+Issue: The building placement (startBuildingPlacement in GameScene.ts) creates Phaser graphics (grid, preview, indicator) directly. This mixes UI feedback with core game logic and might be less performant/flexible than using the React UI layer.
+Fix: Refactor building placement. Keep the state (buildingPlacementActive, buildingPlacementType) in GameScene. Use the Phaser event system to notify React (GameIntegration.tsx/GameHUD.tsx). Let React render the preview/grid overlay using HTML/CSS/SVG, positioned based on mouse coordinates mapped from Phaser. The validity check (isValidBuildingPlacement) should still happen in GameScene, perhaps firing an event back to React to update the preview color (valid/invalid). The final placement click is sent back to GameScene to execute.
+UI Feedback for Action Requirements:
+Issue: Buttons in gameHUD.tsx (Train, Build, Research) don't visually indicate why they might be disabled (insufficient resources, tech prerequisites not met).
+Fix: Enhance GameHUD.tsx. Before rendering buttons, check resource state (ResourceManager.ts) and tech state (TechManager.ts). If an action isn't possible, disable the button and use the Tooltip component (already imported) to show the specific requirements (e.g., "Needs 100 Food, 50 Ore", "Requires Advanced Metalworking").
