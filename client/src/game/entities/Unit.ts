@@ -430,6 +430,33 @@ export class Unit {
         range: 4,
         speed: 70
       };
+    } else if (this.type === "cavalry") {
+      stats = {
+        health: 120,
+        attack: 18,
+        defense: 8,
+        range: 1,
+        speed: 120 // Faster movement
+      };
+    } else if (this.type === "striplingWarrior" && this.faction === "Nephites") {
+      // Stripling Warriors - known for their faith and preservation in battle
+      // "They were exceedingly valiant for courage, and also for strength and activity"
+      stats = {
+        health: 110,        // Strong vitality 
+        attack: 14,         // Good but not exceptional attack
+        defense: 18,        // Exceptionally high defense (faith shield)
+        range: 1,           // Melee unit
+        speed: 90           // Good mobility
+      };
+    } else if (this.type === "lamaniteScout" && this.faction === "Lamanites") {
+      // Lamanite Scouts - stealthy reconnaissance units
+      stats = {
+        health: 60,         // Low health (stealth over armor)
+        attack: 10,         // Moderate attack
+        defense: 5,         // Low defense
+        range: 2,           // Can attack from distance
+        speed: 130          // Extremely fast
+      };
     } else if (this.type === "hero") {
       // Hero units based on Book of Mormon figures
       if (this.faction === "Nephites") {
@@ -462,6 +489,15 @@ export class Unit {
       if (this.type === "ranged") {
         stats.range += 1; // Increased range due to better positioning
       }
+      
+      // Special bonus for Stripling Warriors (based on story)
+      if (this.type === "striplingWarrior") {
+        // "And to our great astonishment, and also the joy of our whole army, 
+        // there was not one soul of them who did perish."
+        stats.defense += 5; // Extraordinary protection
+        // They had faith that added to their protection
+        this.hasFaithShield = true;
+      }
     } else if (this.faction === "Lamanites") {
       // Lamanites have stronger attack
       stats.attack += 3;
@@ -470,6 +506,13 @@ export class Unit {
       if (this.type === "melee") {
         stats.attack += 2;
         stats.speed += 5; // More ferocious in battle
+      }
+      
+      // Special bonus for Lamanite Scouts
+      if (this.type === "lamaniteScout") {
+        stats.speed += 10; // Even faster
+        // Stealth abilities will be managed elsewhere
+        this.isStealthed = true; // Start in stealth mode
       }
     }
     
