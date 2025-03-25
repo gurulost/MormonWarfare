@@ -217,6 +217,10 @@ export class BuildingManager {
       map = this.scene.game.registry.get("map") || [];
     }
     
+    // Create a spawn animation at the building
+    this.createSpawnAnimation(building, unitType);
+    
+    // Find a suitable spawn position
     for (const offset of spiralOffsets) {
       const x = buildingX + offset.x;
       const y = buildingY + offset.y;
@@ -229,8 +233,16 @@ export class BuildingManager {
       
       // Check if position is valid and walkable
       if (x >= 0 && y >= 0 && y < map.length && map[y] && x < map[y].length && map[y][x] && map[y][x].walkable) {
-        // Create the unit
-        this.unitManager.createUnit(building.playerId, unitType as any, x, y);
+        // Create the unit with a spawn animation
+        const unit = this.unitManager.createUnit(building.playerId, unitType as any, x, y);
+        
+        if (unit) {
+          // Create a spawn-in effect for the unit
+          this.createUnitSpawnEffect(unit);
+        }
+        
+        // Display notification text
+        this.showUnitProducedNotification(building, unitType);
         
         // Play success sound
         const audioStore = useAudio.getState();
@@ -243,6 +255,148 @@ export class BuildingManager {
     }
     
     console.warn(`Could not find a valid position to place unit ${unitType} from building ${building.id}`);
+  }
+  
+  /**
+   * Creates a visual spawn animation at the building when a unit is produced
+   */
+  private createSpawnAnimation(building: Building, unitType: string) {
+    const scene = this.scene;
+    const x = building.x;
+    const y = building.y;
+    
+    // Create a flash effect
+    const flash = scene.add.circle(x, y, 20, 0xffffff, 0.7);
+    
+    // Add scale animation
+    scene.tweens.add({
+      targets: flash,
+      scale: { from: 0.5, to: 2 },
+      alpha: { from: 0.7, to: 0 },
+      duration: 500,
+      onComplete: () => {
+        flash.destroy();
+      }
+    });
+    
+    // Create a simpler particle effect using shapes instead of particles system
+    // This avoids issues with different Phaser versions
+    for (let i = 0; i < 12; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 20 + Math.random() * 30;
+      const distance = 30 + Math.random() * 20;
+      const size = 3 + Math.random() * 4;
+      
+      // Create a single particle
+      const particle = scene.add.circle(
+        x, 
+        y, 
+        size, 
+        this.getColorForUnitType(unitType),
+        0.7
+      );
+      
+      // Animate the particle
+      scene.tweens.add({
+        targets: particle,
+        x: x + Math.cos(angle) * distance,
+        y: y + Math.sin(angle) * distance,
+        alpha: 0,
+        scale: { from: 1, to: 0.3 },
+        duration: 500 + Math.random() * 300,
+        ease: 'Power2',
+        onComplete: () => {
+          particle.destroy();
+        }
+      });
+    }
+  }
+  
+  /**
+   * Create an effect when a new unit spawns
+   */
+  private createUnitSpawnEffect(unit: any) {
+    if (!unit || !unit.sprite) return;
+    
+    const scene = this.scene;
+    
+    // Flash effect
+    scene.tweens.add({
+      targets: unit.sprite,
+      alpha: { from: 0.3, to: 1 },
+      scale: { from: 0.5, to: 1 },
+      duration: 500,
+      ease: 'Cubic.out'
+    });
+    
+    // Add a temporary circle expand effect
+    const spawnCircle = scene.add.circle(0, 0, 15, 0xffffff, 0.4);
+    unit.sprite.add(spawnCircle);
+    
+    scene.tweens.add({
+      targets: spawnCircle,
+      scale: { from: 0.8, to: 1.5 },
+      alpha: { from: 0.4, to: 0 },
+      duration: 700,
+      onComplete: () => {
+        spawnCircle.destroy();
+      }
+    });
+  }
+  
+  /**
+   * Shows a floating notification when a unit is produced
+   */
+  private showUnitProducedNotification(building: Building, unitType: string) {
+    const x = building.x;
+    const y = building.y - 30;
+    
+    // Create a notification text that floats up
+    const text = this.scene.add.text(x, y, `${this.getReadableUnitName(unitType)} Ready!`, {
+      fontSize: '12px',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 3,
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+    
+    // Animate the text floating up and fading out
+    this.scene.tweens.add({
+      targets: text,
+      y: y - 40,
+      alpha: { from: 1, to: 0 },
+      duration: 1500,
+      ease: 'Cubic.out',
+      onComplete: () => {
+        text.destroy();
+      }
+    });
+  }
+  
+  /**
+   * Get a readable name for the unit type
+   */
+  private getReadableUnitName(unitType: string): string {
+    switch (unitType) {
+      case "worker": return "Worker";
+      case "melee": return "Warrior";
+      case "ranged": return "Archer";
+      case "hero": return "Hero";
+      default: return unitType;
+    }
+  }
+  
+  /**
+   * Get the appropriate color for a unit type
+   */
+  private getColorForUnitType(unitType: string): number {
+    switch (unitType) {
+      case "worker": return 0x33cc33; // Green for workers
+      case "melee": return 0xcc3333;  // Red for melee
+      case "ranged": return 0x3333cc; // Blue for ranged
+      case "hero": return 0xffcc00;   // Gold for hero
+      default: return 0xaaaaaa;       // Gray for unknown
+    }
   }
   
   queueUnitProduction(buildingId: string, unitType: string): boolean {

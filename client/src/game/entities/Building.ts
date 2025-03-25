@@ -264,7 +264,9 @@ export class Building {
         }
       ).setOrigin(0.5);
       
-      this.queueIndicators.add([bg, label]);
+      if (this.queueIndicators) {
+        this.queueIndicators.add([bg, label]);
+      }
     });
   }
   
