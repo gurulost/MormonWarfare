@@ -8,28 +8,33 @@ interface GameOverlayProps {
   onUnitClick: (unitId: string) => void;
   onTerrainClick: (x: number, y: number) => void;
   isVisible: boolean;
+  isTransitioning?: boolean;
 }
 
 export const GameOverlay: React.FC<GameOverlayProps> = ({
   gameData,
   onUnitClick,
   onTerrainClick,
-  isVisible
+  isVisible,
+  isTransitioning: externalTransitioning = false
 }) => {
   const gameState = useGame();
   const [units, setUnits] = useState<any[]>([]);
   const [buildings, setBuildings] = useState<any[]>([]);
   const [mapData, setMapData] = useState<any[][]>([]);
   const [loading, setLoading] = useState(true);
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [internalTransitioning, setInternalTransitioning] = useState(false);
   const prevVisibleRef = useRef(isVisible);
+  
+  // Combine external and internal transitioning states
+  const isTransitioning = externalTransitioning || internalTransitioning;
   
   // Handle transition when visibility changes
   useEffect(() => {
     if (isVisible !== prevVisibleRef.current) {
       if (isVisible) {
         // Transitioning to visible state - start animation
-        setIsTransitioning(true);
+        setInternalTransitioning(true);
       }
       prevVisibleRef.current = isVisible;
     }
@@ -116,7 +121,7 @@ export const GameOverlay: React.FC<GameOverlayProps> = ({
 
   // Handle transition complete
   const handleTransitionComplete = () => {
-    setIsTransitioning(false);
+    setInternalTransitioning(false);
   };
 
   // If not visible and not transitioning, don't render

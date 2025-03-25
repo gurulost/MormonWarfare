@@ -307,6 +307,7 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
         onUnitClick={handleUnitClick}
         onTerrainClick={handleTerrainClick}
         isVisible={overlayVisible}
+        isTransitioning={isTransitioning}
       />
       
       {/* Game HUD with improved UI */}
@@ -329,13 +330,87 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
         onMinimapClick={handleMinimapClick}
       />
       
-      {/* Toggle button for switching between 3D/2D views */}
-      <button
-        className="fixed right-4 top-16 z-50 bg-black/70 text-white px-3 py-2 rounded-md text-sm shadow-lg backdrop-blur-md"
-        onClick={() => setOverlayVisible(prev => !prev)}
-      >
-        {overlayVisible ? "Switch to 2D View" : "Switch to 3D View"}
-      </button>
+      {/* Enhanced view mode controls */}
+      <div className="fixed right-4 top-16 z-50 flex flex-col gap-2">
+        <button
+          className="bg-black/70 text-white px-3 py-2 rounded-md text-sm shadow-lg backdrop-blur-md hover:bg-black/90 transition-colors"
+          onClick={() => {
+            // Start transition animation before changing view
+            setIsTransitioning(true);
+            
+            // Sync camera positions between 2D and 3D before switching
+            const gameScene = gameInstance?.scene.getScene("GameScene") as any;
+            const cameraControls = (window as any).cameraControls;
+            
+            if (gameScene && cameraControls) {
+              // If switching to 2D, remember 3D camera position to restore later
+              if (overlayVisible) {
+                // Store the current 3D camera position for later use
+                console.log("Storing 3D camera position for later restoration");
+              } 
+              // If switching to 3D, align the 3D camera with the 2D view
+              else {
+                // Use the current 2D camera position to position the 3D camera
+                console.log("Aligning 3D camera with 2D view");
+                setTimeout(() => {
+                  try {
+                    cameraControls.setStrategicView();
+                    
+                    // Focus on the same area the 2D camera was looking at
+                    if (gameScene.cameras && gameScene.cameras.main) {
+                      const camera = gameScene.cameras.main;
+                      const mapSize = gameScene.map ? gameScene.map.length : 50;
+                      const centerX = camera.scrollX + camera.width / 2;
+                      const centerY = camera.scrollY + camera.height / 2;
+                      
+                      // Convert to grid coordinates
+                      const gridX = centerX / 32; // Assuming TILE_SIZE = 32
+                      const gridY = centerY / 32;
+                      
+                      // Focus the 3D camera on this position
+                      cameraControls.focusOnPosition(gridX, 0, gridY);
+                    }
+                  } catch (error) {
+                    console.error("Error aligning cameras:", error);
+                  }
+                }, 100);
+              }
+            }
+            
+            // Toggle the overlay visibility after a short delay
+            setTimeout(() => {
+              setOverlayVisible(prev => !prev);
+              setIsTransitioning(false);
+            }, 300);
+          }}
+        >
+          {overlayVisible ? "Switch to 2D View" : "Switch to 3D View"}
+        </button>
+        
+        {/* Additional view control buttons - only visible in 3D mode */}
+        {overlayVisible && (
+          <>
+            <button
+              className="bg-black/70 text-white px-3 py-2 rounded-md text-sm shadow-lg backdrop-blur-md hover:bg-black/90 transition-colors"
+              onClick={() => handleCameraViewChange('strategic')}
+            >
+              Strategic View
+            </button>
+            <button
+              className="bg-black/70 text-white px-3 py-2 rounded-md text-sm shadow-lg backdrop-blur-md hover:bg-black/90 transition-colors"
+              onClick={() => handleCameraViewChange('overhead')}
+            >
+              Top-Down View
+            </button>
+            <button
+              className="bg-black/70 text-white px-3 py-2 rounded-md text-sm shadow-lg backdrop-blur-md hover:bg-black/90 transition-colors"
+              onClick={() => handleCameraViewChange('rotate')}
+            >
+              Rotate View
+            </button>
+          </>
+        )}
+      </div>
     </>
   );
 };
