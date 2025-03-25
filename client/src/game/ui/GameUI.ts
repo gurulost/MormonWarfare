@@ -4,6 +4,7 @@ import { UnitManager } from "../managers/UnitManager";
 import { BuildingManager } from "../managers/BuildingManager";
 import { TechManager } from "../managers/TechManager";
 import { UI_PANEL_HEIGHT, BUILDING_STATS } from "../config";
+import { UnitStance } from "../entities/Unit";
 
 export class GameUI {
   private scene: Phaser.Scene;
@@ -514,8 +515,161 @@ export class GameUI {
   }
   
   createMilitaryButtons() {
-    // For military units, no special actions available yet
-    // In a full implementation, this would include "Attack" or special abilities
+    const { width, height } = this.scene.cameras.main;
+    const buttonY = height - UI_PANEL_HEIGHT / 2;
+    let buttonX = width / 2 - 200;
+    
+    // Create stance buttons for controlling unit behavior
+    this.createStanceButtons(buttonX, buttonY);
+    
+    // Create patrol button
+    buttonX += 200;
+    this.createActionButton(
+      buttonX, buttonY,
+      "Set Patrol",
+      () => this.initiatePatrol()
+    );
+    
+    // Create attack-move button
+    buttonX += 100;
+    this.createActionButton(
+      buttonX, buttonY,
+      "Attack-Move",
+      () => this.initiateAttackMove()
+    );
+  }
+  
+  /**
+   * Create stance control buttons for military units
+   */
+  private createStanceButtons(startX: number, y: number) {
+    const stances: UnitStance[] = ['aggressive', 'defensive', 'hold-position', 'stand-ground'];
+    const stanceLabels: Record<UnitStance, string> = {
+      'aggressive': 'Aggressive',
+      'defensive': 'Defensive',
+      'hold-position': 'Hold Position',
+      'stand-ground': 'Stand Ground'
+    };
+    const stanceColors: Record<UnitStance, number> = {
+      'aggressive': 0xcc3333, // Red for aggressive
+      'defensive': 0x33cc33, // Green for defensive
+      'hold-position': 0x3333cc, // Blue for hold position
+      'stand-ground': 0xcccc33  // Yellow for stand ground
+    };
+    
+    // Create a container for stance buttons
+    const stanceContainer = this.scene.add.container(startX, y);
+    
+    // Create background panel
+    const background = this.scene.add.rectangle(
+      0, 0, 180, 90, 0x333333, 0.8
+    ).setStrokeStyle(1, 0xffffff, 0.5);
+    stanceContainer.add(background);
+    
+    // Add title
+    const title = this.scene.add.text(
+      0, -35, "Unit Stance", 
+      { 
+        fontFamily: "monospace", 
+        fontSize: "14px", 
+        color: "#ffffff",
+        align: "center"
+      }
+    ).setOrigin(0.5);
+    stanceContainer.add(title);
+    
+    // Create a button for each stance
+    stances.forEach((stance, index) => {
+      const col = index % 2;
+      const row = Math.floor(index / 2);
+      const posX = col * 85 - 42;
+      const posY = row * 30 - 5;
+      
+      const button = this.scene.add.rectangle(
+        posX, posY, 80, 25, stanceColors[stance], 0.8
+      ).setStrokeStyle(1, 0xffffff, 0.5)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerover", () => {
+        button.setFillStyle(stanceColors[stance], 1);
+      })
+      .on("pointerout", () => {
+        button.setFillStyle(stanceColors[stance], 0.8);
+      })
+      .on("pointerdown", () => {
+        this.setUnitStance(stance);
+      });
+      
+      const label = this.scene.add.text(
+        posX, posY, 
+        stanceLabels[stance], 
+        { 
+          fontFamily: "monospace", 
+          fontSize: "10px", 
+          color: "#ffffff",
+          align: "center"
+        }
+      ).setOrigin(0.5);
+      
+      stanceContainer.add([button, label]);
+    });
+    
+    this.actionButtons.push(stanceContainer);
+  }
+  
+  /**
+   * Set the stance for all selected units
+   */
+  private setUnitStance(stance: UnitStance) {
+    const selectedUnitIds = this.scene.registry.get("selectedUnits") || [];
+    
+    if (selectedUnitIds.length === 0) {
+      return;
+    }
+    
+    // Apply stance to all selected units
+    selectedUnitIds.forEach((unitId: string) => {
+      const unit = this.unitManager.getUnit(unitId);
+      if (unit) {
+        unit.setStance(stance);
+      }
+    });
+    
+    // Show feedback
+    this.showMessage(`Units set to ${stance} stance`);
+  }
+  
+  /**
+   * Initiate patrol mode - player will need to select start and end points
+   */
+  private initiatePatrol() {
+    const selectedUnitIds = this.scene.registry.get("selectedUnits") || [];
+    
+    if (selectedUnitIds.length === 0) {
+      return;
+    }
+    
+    // Show instructions message
+    this.showMessage("Click to set patrol start point");
+    
+    // Set game to patrol mode - this would be handled in GameScene
+    this.scene.events.emit("setPatrolMode", selectedUnitIds);
+  }
+  
+  /**
+   * Initiate attack-move mode - units will attack enemies encountered while moving
+   */
+  private initiateAttackMove() {
+    const selectedUnitIds = this.scene.registry.get("selectedUnits") || [];
+    
+    if (selectedUnitIds.length === 0) {
+      return;
+    }
+    
+    // Show instructions message
+    this.showMessage("Click target location for attack-move");
+    
+    // Set game to attack-move mode - this would be handled in GameScene
+    this.scene.events.emit("setAttackMoveMode", selectedUnitIds);
   }
   
   createActionButton(

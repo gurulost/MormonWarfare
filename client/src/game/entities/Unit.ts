@@ -357,7 +357,50 @@ export class Unit {
     return stats;
   }
   
-
+  /**
+   * Handle patrol movement logic
+   * When one patrol point is reached, move to the other
+   */
+  private handlePatrolMovement() {
+    if (!this.isPatrolling || !this.patrolStartX || !this.patrolStartY || 
+        !this.patrolEndX || !this.patrolEndY) {
+      return;
+    }
+    
+    // Determine which patrol point to move to next
+    const currentX = Math.floor(this.x / TILE_SIZE);
+    const currentY = Math.floor(this.y / TILE_SIZE);
+    
+    // If we're at or near the end point, go to start point
+    if (Math.abs(currentX - this.patrolEndX) <= 1 && Math.abs(currentY - this.patrolEndY) <= 1) {
+      this.setPath([{ x: this.patrolStartX, y: this.patrolStartY }]);
+    } 
+    // If we're at or near the start point, go to end point
+    else if (Math.abs(currentX - this.patrolStartX) <= 1 && Math.abs(currentY - this.patrolStartY) <= 1) {
+      this.setPath([{ x: this.patrolEndX, y: this.patrolEndY }]);
+    }
+  }
+  
+  /**
+   * Check for enemies while performing attack-move
+   * This should be called by the CombatManager to scan for enemies
+   */
+  private handleAttackMoveCheck() {
+    // This will be filled by CombatManager logic to scan for enemies
+    // and engage them if found based on the unit's stance and attack range
+    if (!this.isAttackMoving) return;
+    
+    // If we've reached our attack-move destination, stop attack-moving
+    const currentX = Math.floor(this.x / TILE_SIZE);
+    const currentY = Math.floor(this.y / TILE_SIZE);
+    
+    if (this.attackMoveTargetX !== null && this.attackMoveTargetY !== null) {
+      if (Math.abs(currentX - this.attackMoveTargetX) <= 1 && 
+          Math.abs(currentY - this.attackMoveTargetY) <= 1) {
+        this.stopAttackMove();
+      }
+    }
+  }
   
   update(delta: number) {
     // Update health bar
@@ -821,30 +864,6 @@ export class Unit {
   }
   
   /**
-   * Handle patrol movement logic
-   * When one patrol point is reached, move to the other
-   */
-  private handlePatrolMovement() {
-    if (!this.isPatrolling || !this.patrolStartX || !this.patrolStartY || 
-        !this.patrolEndX || !this.patrolEndY) {
-      return;
-    }
-    
-    // Determine which patrol point to move to next
-    const currentX = Math.floor(this.x / TILE_SIZE);
-    const currentY = Math.floor(this.y / TILE_SIZE);
-    
-    // If we're at or near the end point, go to start point
-    if (Math.abs(currentX - this.patrolEndX) <= 1 && Math.abs(currentY - this.patrolEndY) <= 1) {
-      this.setPath([{ x: this.patrolStartX, y: this.patrolStartY }]);
-    } 
-    // If we're at or near the start point, go to end point
-    else if (Math.abs(currentX - this.patrolStartX) <= 1 && Math.abs(currentY - this.patrolStartY) <= 1) {
-      this.setPath([{ x: this.patrolEndX, y: this.patrolEndY }]);
-    }
-  }
-  
-  /**
    * Start attack-move to a position
    * Unit will move to the position while attacking any enemy encountered
    */
@@ -866,26 +885,5 @@ export class Unit {
     this.isAttackMoving = false;
     this.attackMoveTargetX = null;
     this.attackMoveTargetY = null;
-  }
-  
-  /**
-   * Check for enemies while performing attack-move
-   * This should be called by the CombatManager to scan for enemies
-   */
-  private handleAttackMoveCheck() {
-    // This will be filled by CombatManager logic to scan for enemies
-    // and engage them if found based on the unit's stance and attack range
-    if (!this.isAttackMoving) return;
-    
-    // If we've reached our attack-move destination, stop attack-moving
-    const currentX = Math.floor(this.x / TILE_SIZE);
-    const currentY = Math.floor(this.y / TILE_SIZE);
-    
-    if (this.attackMoveTargetX !== null && this.attackMoveTargetY !== null) {
-      if (Math.abs(currentX - this.attackMoveTargetX) <= 1 && 
-          Math.abs(currentY - this.attackMoveTargetY) <= 1) {
-        this.stopAttackMove();
-      }
-    }
   }
 }

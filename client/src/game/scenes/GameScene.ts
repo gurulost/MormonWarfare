@@ -41,6 +41,13 @@ export class GameScene extends Phaser.Scene {
   private selectionStart: { x: number; y: number } = { x: 0, y: 0 };
   private isSelecting: boolean = false;
   
+  // Control modes for unit commands
+  private patrolMode: boolean = false;
+  private attackMoveMode: boolean = false;
+  private unitsForPatrol: string[] = [];
+  private unitsForAttackMove: string[] = [];
+  private patrolStartPoint: { x: number, y: number } | null = null;
+  
   // Minimap
   private minimap!: Phaser.GameObjects.Graphics;
   private minimapSize: number = 150;

@@ -9,6 +9,7 @@ import {
 } from "../config";
 import { UnitStats, UnitType } from "../types";
 import { useAudio } from "../../lib/stores/useAudio";
+import { Unit, UnitStance } from "../entities/Unit";
 
 // Type for game Unit that includes position and other essential properties
 interface GameUnit {
@@ -24,11 +25,13 @@ export class CombatManager {
   private scene: Phaser.Scene;
   private unitManager: UnitManager;
   private lastCombatUpdate: number;
+  private autoEngageCheckTimer: number;
   
   constructor(scene: Phaser.Scene, unitManager: UnitManager) {
     this.scene = scene;
     this.unitManager = unitManager;
     this.lastCombatUpdate = 0;
+    this.autoEngageCheckTimer = 0;
   }
   
   update(delta: number) {
@@ -37,7 +40,83 @@ export class CombatManager {
     
     if (this.lastCombatUpdate >= COMBAT_UPDATE_RATE) {
       this.processCombat();
+      this.processUnitStances();
+      this.processAttackMove();
       this.lastCombatUpdate = 0;
+    }
+  }
+  
+  /**
+   * Process unit stances and auto-engage behavior based on stance settings
+   */
+  private processUnitStances() {
+    const units = this.unitManager.getAllUnits();
+    
+    for (const unit of units) {
+      // Skip units that are already engaged in combat or gathering
+      if (unit.isAttacking || unit.isGathering) continue;
+      
+      // Auto-engage behavior varies by unit stance
+      switch (unit.stance) {
+        case 'aggressive':
+          // Aggressive units will actively seek out enemies within a large range
+          this.checkForTargetsInRange(unit, unit.range * 2.5);
+          break;
+          
+        case 'defensive':
+          // Defensive units will only engage enemies that come within their range
+          this.checkForTargetsInRange(unit, unit.range * 1.5);
+          break;
+          
+        case 'hold-position':
+          // Hold position units will only engage enemies in their attack range but won't chase
+          this.checkForTargetsInRange(unit, unit.range);
+          break;
+          
+        case 'stand-ground':
+          // Stand ground units will not auto-engage at all
+          break;
+      }
+    }
+  }
+  
+  /**
+   * Process attack-move commands
+   */
+  private processAttackMove() {
+    const units = this.unitManager.getAllUnits();
+    
+    for (const unit of units) {
+      // Skip units that are not in attack-move mode or are already attacking
+      if (!unit.isAttackMoving || unit.isAttacking) continue;
+      
+      // Check for enemies along the path to the attack-move destination
+      this.checkForTargetsInRange(unit, unit.range * 1.5);
+    }
+  }
+  
+  /**
+   * Check for enemy units in range and engage if found
+   * @param unit Unit that is checking for targets
+   * @param range Range to check for enemies
+   */
+  private checkForTargetsInRange(unit: Unit, range: number) {
+    const allUnits = this.unitManager.getAllUnits();
+    const nearestEnemy = this.findNearestEnemyUnit(unit, allUnits, range);
+    
+    if (nearestEnemy) {
+      // If it's a hold-position unit, only engage if enemy is within attack range
+      if (unit.stance === 'hold-position') {
+        const distanceToEnemy = Phaser.Math.Distance.Between(
+          unit.x, unit.y, nearestEnemy.x, nearestEnemy.y);
+        
+        if (distanceToEnemy / TILE_SIZE > unit.range) {
+          return; // Enemy is outside attack range, don't pursue
+        }
+      }
+      
+      // Engage the enemy
+      unit.setAttackingTarget(nearestEnemy.id);
     }
   }
   
@@ -277,46 +356,57 @@ export class CombatManager {
     // Process each unit that is not already attacking
     for (const unit of units) {
       if (!unit.isAttacking && !unit.isGathering && unit.type !== "worker") {
-        // Look for enemy units nearby
-        const nearestEnemy = this.findNearestEnemyUnit(unit, units);
+        // Look for enemy units nearby (within sight range: 2 tiles beyond attack range)
+        const sightRange = unit.range + 2;
+        const nearestEnemy = this.findNearestEnemyUnit(unit, units, sightRange);
         
         if (nearestEnemy) {
-          // Only auto-engage if enemy is very close
+          // Calculate distance to enemy
           const distance = Phaser.Math.Distance.Between(unit.x, unit.y, nearestEnemy.x, nearestEnemy.y);
           const tileDistance = distance / TILE_SIZE;
           
-          // Auto-engage only if enemy is within sight range (2 tiles beyond attack range)
-          if (tileDistance <= unit.range + 2) {
-            // Set attacking state
-            unit.setAttackingTarget(nearestEnemy.id);
+          // Set attacking state
+          unit.setAttackingTarget(nearestEnemy.id);
+          
+          // Only move if not already in range
+          if (tileDistance > unit.range) {
+            // Calculate target position in grid coordinates
+            const targetTileX = Math.floor(nearestEnemy.x / TILE_SIZE);
+            const targetTileY = Math.floor(nearestEnemy.y / TILE_SIZE);
             
-            // Only move if not already in range
-            if (tileDistance > unit.range) {
-              // Calculate target position in grid coordinates
-              const targetTileX = Math.floor(nearestEnemy.x / TILE_SIZE);
-              const targetTileY = Math.floor(nearestEnemy.y / TILE_SIZE);
-              
-              // Move toward target
-              this.unitManager.moveUnitsTo([unit.id], targetTileX, targetTileY);
-            }
+            // Move toward target
+            this.unitManager.moveUnitsTo([unit.id], targetTileX, targetTileY);
           }
         }
       }
     }
   }
 
-  private findNearestEnemyUnit(unit: any, allUnits: any[]): any | null {
+  /**
+   * Finds the nearest enemy unit to the given unit within a specified range
+   * @param unit The unit looking for enemies
+   * @param allUnits All units on the battlefield
+   * @param maxRange Maximum range to search for enemies (in tiles)
+   * @returns The nearest enemy unit or null if none found
+   */
+  private findNearestEnemyUnit(unit: any, allUnits: any[], maxRange: number = Infinity): any | null {
     let nearestEnemy = null;
     let nearestDistance = Infinity;
     
     for (const otherUnit of allUnits) {
-      // Skip if same player or not a combat unit
+      // Skip if same player
       if (otherUnit.playerId === unit.playerId) {
         continue;
       }
       
       // Calculate distance
       const distance = Phaser.Math.Distance.Between(unit.x, unit.y, otherUnit.x, otherUnit.y);
+      const tileDistance = distance / TILE_SIZE;
+      
+      // Skip if beyond maximum range
+      if (tileDistance > maxRange) {
+        continue;
+      }
       
       // Update nearest enemy if this one is closer
       if (distance < nearestDistance) {
