@@ -5,6 +5,7 @@ import { useMultiplayer } from "@/lib/stores/useMultiplayer";
 import GameOverlay from "@/components/3d/GameOverlay";
 import FactionAbilityPanel from "@/components/ui/FactionAbilityPanel";
 import { useFactionAbilities } from "@/lib/stores/useFactionAbilities";
+import { EVENTS } from "@/game/events/PhaserEvents";
 
 interface GameIntegrationProps {
   gameInstance?: Phaser.Game;

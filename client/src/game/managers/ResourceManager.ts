@@ -7,6 +7,7 @@ import {
   RESOURCE_CARRY_CAPACITY,
   FACTION_GATHER_BONUSES 
 } from "../config";
+import { phaserEvents, EVENTS } from "../events/PhaserEvents";
 
 export class ResourceManager {
   private scene: Phaser.Scene;
@@ -29,13 +30,21 @@ export class ResourceManager {
       startingOre += 50;
     }
     
-    this.resources.set(playerId, {
+    const resources = {
       food: startingFood,
       ore: startingOre
-    });
+    };
+    
+    this.resources.set(playerId, resources);
     
     // Log initial resources
     console.log(`Player ${playerId} (${faction}) starting resources: ${startingFood} food, ${startingOre} ore`);
+    
+    // Emit resources updated event
+    phaserEvents.emit(EVENTS.RESOURCES_UPDATED, {
+      playerId,
+      resources
+    });
   }
   
   getPlayerResources(playerId: string) {
@@ -57,6 +66,12 @@ export class ResourceManager {
     if (playerId === this.scene.game.registry.get("localPlayerId")) {
       this.syncResourcesWithServer(playerId);
     }
+    
+    // Emit resources updated event
+    phaserEvents.emit(EVENTS.RESOURCES_UPDATED, {
+      playerId,
+      resources: playerResources
+    });
     
     return playerResources;
   }
@@ -85,11 +100,23 @@ export class ResourceManager {
       this.syncResourcesWithServer(playerId);
     }
     
+    // Emit resources updated event
+    phaserEvents.emit(EVENTS.RESOURCES_UPDATED, {
+      playerId,
+      resources: playerResources
+    });
+    
     return true;
   }
   
   updateResources(playerId: string, resources: { food: number; ore: number }) {
     this.resources.set(playerId, resources);
+    
+    // Emit resources updated event
+    phaserEvents.emit(EVENTS.RESOURCES_UPDATED, {
+      playerId,
+      resources
+    });
   }
   
   hasEnoughResources(playerId: string, foodCost: number, oreCost: number): boolean {
