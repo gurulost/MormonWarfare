@@ -38,6 +38,7 @@ export class GameScene extends Phaser.Scene {
   
   // Selection
   private selectedUnits: string[] = [];
+  private selectedBuildingId: string | null = null;
   private selectionRect!: Phaser.GameObjects.Rectangle;
   private selectionStart: { x: number; y: number } = { x: 0, y: 0 };
   private isSelecting: boolean = false;
@@ -804,10 +805,13 @@ export class GameScene extends Phaser.Scene {
               building.setSelected(true);
               
               // Emit building selected event
-              phaserEvents.emit(EVENTS.BUILDING_SELECTED, {
-                building: building,
-                playerId: this.localPlayerId
+              const buildingSelectedEvent = new CustomEvent(EVENTS.BUILDING_SELECTED, {
+                detail: {
+                  building: building,
+                  playerId: this.localPlayerId
+                }
               });
+              document.dispatchEvent(buildingSelectedEvent);
               
               // Update UI with building selection (legacy method)
               this.gameUI.updateSelection([], this.selectedBuildingId);
@@ -1173,6 +1177,87 @@ export class GameScene extends Phaser.Scene {
   
   getSelectedUnits(): string[] {
     return this.selectedUnits;
+  }
+  
+  /**
+   * Selects a building by its ID and emits a building selection event
+   */
+  selectBuildingById(buildingId: string): void {
+    // Clear any unit selection first to avoid having both selected
+    this.clearSelection('units');
+    
+    // Get the building
+    const building = this.buildingManager.getBuilding(buildingId);
+    if (!building) {
+      console.error(`Building with ID ${buildingId} not found`);
+      return;
+    }
+    
+    // Check if it belongs to the local player
+    if (building.playerId !== this.localPlayerId) {
+      console.warn(`Building ${buildingId} belongs to another player`);
+      return;
+    }
+    
+    // Update building selection state
+    this.selectedBuildingId = buildingId;
+    building.setSelected(true);
+    
+    // Emit building selected event
+    const event = new CustomEvent(EVENTS.BUILDING_SELECTED, {
+      detail: {
+        building,
+        playerId: this.localPlayerId
+      }
+    });
+    document.dispatchEvent(event);
+    
+    console.log(`Building selected: ${buildingId}, type: ${building.type}`);
+  }
+  
+  /**
+   * Clear selection of units, buildings, or both
+   */
+  clearSelection(type: 'units' | 'buildings' | 'all' = 'all'): void {
+    if (type === 'units' || type === 'all') {
+      // Clear unit selection
+      this.selectedUnits.forEach(unitId => {
+        const unit = this.unitManager.getUnit(unitId);
+        if (unit) {
+          unit.setSelected(false);
+        }
+      });
+      this.selectedUnits = [];
+      
+      // Emit selection cleared event for units
+      const event = new CustomEvent(EVENTS.SELECTION_CLEARED, {
+        detail: {
+          type: 'units',
+          playerId: this.localPlayerId
+        }
+      });
+      document.dispatchEvent(event);
+    }
+    
+    if (type === 'buildings' || type === 'all') {
+      // Clear building selection
+      if (this.selectedBuildingId) {
+        const building = this.buildingManager.getBuilding(this.selectedBuildingId);
+        if (building) {
+          building.setSelected(false);
+        }
+        this.selectedBuildingId = null;
+        
+        // Emit selection cleared event for buildings
+        const event = new CustomEvent(EVENTS.SELECTION_CLEARED, {
+          detail: {
+            type: 'buildings',
+            playerId: this.localPlayerId
+          }
+        });
+        document.dispatchEvent(event);
+      }
+    }
   }
   
   // Method to select a unit by ID - added for 3D view interaction

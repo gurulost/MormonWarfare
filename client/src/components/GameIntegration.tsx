@@ -339,9 +339,63 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
       }
     };
     
+    // Building selection event test button
+    const buildingSelectionButton = document.createElement('button');
+    buildingSelectionButton.textContent = 'Test Building Selection';
+    buildingSelectionButton.style.padding = '8px 16px';
+    buildingSelectionButton.style.backgroundColor = '#9C27B0';
+    buildingSelectionButton.style.color = 'white';
+    buildingSelectionButton.style.border = 'none';
+    buildingSelectionButton.style.borderRadius = '4px';
+    buildingSelectionButton.style.cursor = 'pointer';
+    
+    buildingSelectionButton.onclick = () => {
+      try {
+        // Get the current local player ID
+        const playerId = gameScene.getLocalPlayerId();
+        if (!playerId) {
+          console.error("No local player ID found");
+          return;
+        }
+        
+        // Get a building belonging to the player
+        const buildingManager = gameScene.buildingManager;
+        if (buildingManager) {
+          const playerBuildings = buildingManager.getBuildingsByPlayer(playerId);
+          if (playerBuildings.length > 0) {
+            // Select the first building
+            const buildingId = playerBuildings[0].id;
+            const building = buildingManager.getBuilding(buildingId);
+            console.log('Test building selection event: Selecting building', buildingId);
+            
+            // Emit building selected event
+            const buildingSelectedEvent = new CustomEvent(EVENTS.BUILDING_SELECTED, {
+              detail: {
+                building,
+                playerId
+              }
+            });
+            document.dispatchEvent(buildingSelectedEvent);
+            
+            // Set the building as selected
+            if (building) {
+              building.setSelected(true);
+            }
+          } else {
+            console.warn("No player buildings found for selection test");
+          }
+        } else {
+          console.error("Building manager not found");
+        }
+      } catch (error) {
+        console.error("Error in building selection test button:", error);
+      }
+    };
+
     testDiv.appendChild(resourceTestButton);
     testDiv.appendChild(selectionTestButton);
     testDiv.appendChild(clearSelectionButton);
+    testDiv.appendChild(buildingSelectionButton);
     document.body.appendChild(testDiv);
 
     // Clean up
@@ -353,6 +407,7 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
       document.removeEventListener(EVENTS.RESOURCES_UPDATED, handleResourcesUpdated as EventListener);
       document.removeEventListener(EVENTS.UNITS_SELECTED, handleUnitsSelected as EventListener);
       document.removeEventListener(EVENTS.SELECTION_CLEARED, handleSelectionCleared as EventListener);
+      document.removeEventListener(EVENTS.BUILDING_SELECTED, handleBuildingSelected as EventListener);
       
       // Remove test button
       if (document.body.contains(testDiv)) {
