@@ -55,23 +55,31 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
       }, 1000);
     }
     
+    // Set up resource event listener
+    const handleResourcesUpdated = (event: CustomEvent) => {
+      try {
+        const { playerId, resources: updatedResources } = event.detail;
+        // Only update resources for the local player
+        if (playerId === gameScene.getLocalPlayerId()) {
+          setResources({
+            food: updatedResources.food,
+            ore: updatedResources.ore
+          });
+          console.log("Resources updated via event:", updatedResources);
+        }
+      } catch (error) {
+        console.error("Error handling resource update event:", error);
+      }
+    };
+    
+    // Add resource event listener
+    document.addEventListener(EVENTS.RESOURCES_UPDATED, handleResourcesUpdated as EventListener);
+    
     // Set up data access from Phaser game
     const updateGameData = () => {
       if (!gameScene) return;
       
       try {
-        // Get resources
-        const resourceManager = gameScene.resourceManager;
-        if (resourceManager) {
-          const playerResources = resourceManager.getPlayerResources(gameScene.getLocalPlayerId());
-          if (playerResources) {
-            setResources({ 
-              food: playerResources.food,
-              ore: playerResources.ore
-            });
-          }
-        }
-        
         // Get selected units
         const selectedUnitIds = gameScene.getSelectedUnits();
         if (selectedUnitIds) {
@@ -147,15 +155,28 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
       }
     };
     
-    // Set up interval to update game data
+    // Set up interval to update other game data
     const dataInterval = setInterval(updateGameData, 500);
+    
+    // Initialize resources if they exist
+    const resourceManager = gameScene.resourceManager;
+    if (resourceManager) {
+      const playerResources = resourceManager.getPlayerResources(gameScene.getLocalPlayerId());
+      if (playerResources) {
+        setResources({
+          food: playerResources.food,
+          ore: playerResources.ore
+        });
+      }
+    }
     
     // Clean up
     return () => {
       clearInterval(dataInterval);
       if (cameraTimer) clearTimeout(cameraTimer);
+      document.removeEventListener(EVENTS.RESOURCES_UPDATED, handleResourcesUpdated as EventListener);
     };
-  }, [gameInstance]);
+  }, [gameInstance, playerFaction]);
   
   // Handlers for HUD actions
   const handleBuildUnit = useCallback((type: string) => {

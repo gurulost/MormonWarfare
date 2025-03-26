@@ -64,7 +64,11 @@ class PhaserEventEmitter extends EventTarget {
    */
   emit<T>(eventName: PhaserEventType, detail: T): void {
     const event = new CustomEvent(eventName, { detail });
+    
+    // Dispatch on both this object and the document for React components to catch
     this.dispatchEvent(event);
+    document.dispatchEvent(event);
+    
     console.log(`Event emitted: ${eventName}`, detail);
   }
 }
