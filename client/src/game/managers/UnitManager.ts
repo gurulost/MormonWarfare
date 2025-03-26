@@ -11,6 +11,7 @@ import {
 } from "../config";
 import { useMultiplayer } from "../../lib/stores/useMultiplayer";
 import { useAudio } from "../../lib/stores/useAudio";
+import { phaserEvents, EVENTS } from "../events/PhaserEvents";
 
 export class UnitManager {
   private scene: Phaser.Scene;
@@ -210,6 +211,7 @@ export class UnitManager {
     this.clearMovementRange();
     
     const selectedUnitIds: string[] = [];
+    const selectedUnits: Unit[] = [];
     
     this.units.forEach((unit: Unit) => {
       // Only select units owned by the player
@@ -218,6 +220,7 @@ export class UnitManager {
         if (bounds.contains(unit.x, unit.y)) {
           unit.setSelected(true);
           selectedUnitIds.push(unit.id);
+          selectedUnits.push(unit);
         } else {
           unit.setSelected(false);
         }
@@ -227,6 +230,20 @@ export class UnitManager {
     // If exactly one unit is selected, show its movement range
     if (selectedUnitIds.length === 1) {
       this.showMovementRange(selectedUnitIds[0]);
+    }
+    
+    // Emit an event with the selected units
+    if (selectedUnitIds.length > 0) {
+      phaserEvents.emit(EVENTS.UNITS_SELECTED, {
+        unitIds: selectedUnitIds,
+        playerId: playerId,
+        units: selectedUnits
+      });
+    } else {
+      phaserEvents.emit(EVENTS.SELECTION_CLEARED, {
+        type: 'units',
+        playerId: playerId
+      });
     }
     
     return selectedUnitIds;
@@ -273,7 +290,20 @@ export class UnitManager {
       // Show movement range for the selected unit
       this.showMovementRange(unitToSelect.id);
       
+      // Emit an event for the selected unit
+      phaserEvents.emit(EVENTS.UNITS_SELECTED, {
+        unitIds: [unitToSelect.id],
+        playerId: playerId,
+        units: [unitToSelect]
+      });
+      
       return unitToSelect.id;
+    } else {
+      // Emit a selection cleared event
+      phaserEvents.emit(EVENTS.SELECTION_CLEARED, {
+        type: 'units',
+        playerId: playerId
+      });
     }
     
     return null;

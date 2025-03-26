@@ -72,28 +72,49 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
       }
     };
     
-    // Add resource event listener
-    document.addEventListener(EVENTS.RESOURCES_UPDATED, handleResourcesUpdated as EventListener);
+    // Set up unit selection event listener
+    const handleUnitsSelected = (event: CustomEvent) => {
+      try {
+        const { units, playerId } = event.detail;
+        
+        // Only update for local player
+        if (playerId === gameScene.getLocalPlayerId()) {
+          setSelectedUnits(units);
+          console.log("Units selected via event:", units.map((u: any) => u.id));
+        }
+      } catch (error) {
+        console.error("Error handling unit selection event:", error);
+      }
+    };
     
-    // Set up data access from Phaser game
+    // Set up selection cleared event listener
+    const handleSelectionCleared = (event: CustomEvent) => {
+      try {
+        const { type, playerId } = event.detail;
+        
+        // Only update for local player
+        if (playerId === gameScene.getLocalPlayerId()) {
+          if (type === 'units' || type === 'all') {
+            setSelectedUnits([]);
+            console.log("Unit selection cleared via event");
+          }
+        }
+      } catch (error) {
+        console.error("Error handling selection cleared event:", error);
+      }
+    };
+    
+    // Add event listeners
+    document.addEventListener(EVENTS.RESOURCES_UPDATED, handleResourcesUpdated as EventListener);
+    document.addEventListener(EVENTS.UNITS_SELECTED, handleUnitsSelected as EventListener);
+    document.addEventListener(EVENTS.SELECTION_CLEARED, handleSelectionCleared as EventListener);
+    
+    // Set up data access from Phaser game for items not yet converted to events
     const updateGameData = () => {
       if (!gameScene) return;
       
       try {
-        // Get selected units
-        const selectedUnitIds = gameScene.getSelectedUnits();
-        if (selectedUnitIds) {
-          const unitsList = [];
-          for (const unitId of selectedUnitIds) {
-            const unit = gameScene.unitManager.getUnit(unitId);
-            if (unit) {
-              unitsList.push(unit);
-            }
-          }
-          setSelectedUnits(unitsList);
-        }
-        
-        // Get selected buildings
+        // Get selected buildings - not yet event-driven
         const selectedBuildingsList: any[] = [];
         // We'll need to implement this in the game scene
         setSelectedBuildings(selectedBuildingsList);
@@ -222,7 +243,13 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
     return () => {
       clearInterval(dataInterval);
       if (cameraTimer) clearTimeout(cameraTimer);
+      
+      // Remove all event listeners
       document.removeEventListener(EVENTS.RESOURCES_UPDATED, handleResourcesUpdated as EventListener);
+      document.removeEventListener(EVENTS.UNITS_SELECTED, handleUnitsSelected as EventListener);
+      document.removeEventListener(EVENTS.SELECTION_CLEARED, handleSelectionCleared as EventListener);
+      
+      // Remove test button
       if (document.body.contains(testDiv)) {
         document.body.removeChild(testDiv);
       }
