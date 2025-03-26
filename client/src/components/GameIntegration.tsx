@@ -170,11 +170,62 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
       }
     }
     
+    // Create a test button for resource events
+    const testDiv = document.createElement('div');
+    testDiv.style.position = 'fixed';
+    testDiv.style.bottom = '10px';
+    testDiv.style.left = '10px';
+    testDiv.style.zIndex = '1000';
+    
+    const testButton = document.createElement('button');
+    testButton.textContent = 'Test Resource Event';
+    testButton.style.padding = '8px 16px';
+    testButton.style.backgroundColor = '#4CAF50';
+    testButton.style.color = 'white';
+    testButton.style.border = 'none';
+    testButton.style.borderRadius = '4px';
+    testButton.style.cursor = 'pointer';
+    
+    testButton.onclick = () => {
+      try {
+        // Get the current local player ID
+        const playerId = gameScene.getLocalPlayerId();
+        if (!playerId) {
+          console.error("No local player ID found");
+          return;
+        }
+        
+        // Get current resources and add 100 to each
+        const resourceManager = gameScene.resourceManager;
+        if (resourceManager) {
+          const currentResources = resourceManager.getPlayerResources(playerId);
+          const updatedResources = {
+            food: currentResources.food + 100,
+            ore: currentResources.ore + 100
+          };
+          
+          // Update resources which should trigger our event
+          resourceManager.updateResources(playerId, updatedResources);
+          console.log('Test resource event: Adding 100 to food and ore');
+        } else {
+          console.error("Resource manager not found");
+        }
+      } catch (error) {
+        console.error("Error in test button:", error);
+      }
+    };
+    
+    testDiv.appendChild(testButton);
+    document.body.appendChild(testDiv);
+
     // Clean up
     return () => {
       clearInterval(dataInterval);
       if (cameraTimer) clearTimeout(cameraTimer);
       document.removeEventListener(EVENTS.RESOURCES_UPDATED, handleResourcesUpdated as EventListener);
+      if (document.body.contains(testDiv)) {
+        document.body.removeChild(testDiv);
+      }
     };
   }, [gameInstance, playerFaction]);
   
