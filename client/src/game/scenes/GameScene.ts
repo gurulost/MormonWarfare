@@ -8,11 +8,11 @@ import { CombatManager } from "../managers/CombatManager";
 import { TechManager } from "../managers/TechManager";
 import { TutorialManager } from "../managers/TutorialManager";
 import { GameUI } from "../ui/GameUI";
+import { phaserEvents, EVENTS } from "../events/PhaserEvents";
 import { EnhancedTechTreePanel } from "../ui/EnhancedTechTreePanel";
 import { useMultiplayer } from "../../lib/stores/useMultiplayer";
 import { useAudio } from "../../lib/stores/useAudio";
 import { TILE_SIZE, MAP_SIZE, CAMERA_SPEED } from "../config";
-import { phaserEvents, EVENTS } from "../events/PhaserEvents";
 
 export class GameScene extends Phaser.Scene {
   // Game data
@@ -803,7 +803,13 @@ export class GameScene extends Phaser.Scene {
               // Mark building as selected visually
               building.setSelected(true);
               
-              // Update UI with building selection
+              // Emit building selected event
+              phaserEvents.emit(EVENTS.BUILDING_SELECTED, {
+                building: building,
+                playerId: this.localPlayerId
+              });
+              
+              // Update UI with building selection (legacy method)
               this.gameUI.updateSelection([], this.selectedBuildingId);
               return;
             }

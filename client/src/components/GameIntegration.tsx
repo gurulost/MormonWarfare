@@ -98,9 +98,33 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
             setSelectedUnits([]);
             console.log("Unit selection cleared via event");
           }
+          if (type === 'buildings' || type === 'all') {
+            setSelectedBuildings([]);
+            console.log("Building selection cleared via event");
+          }
         }
       } catch (error) {
         console.error("Error handling selection cleared event:", error);
+      }
+    };
+    
+    // Set up building selection event listener
+    const handleBuildingSelected = (event: CustomEvent) => {
+      try {
+        const { building, playerId } = event.detail;
+        
+        // Only update for local player
+        if (playerId === gameScene.getLocalPlayerId()) {
+          // Set the selected building as a single-item array for consistency
+          setSelectedBuildings([building]);
+          
+          // Clear unit selection when a building is selected
+          setSelectedUnits([]);
+          
+          console.log("Building selected via event:", building.id, building.type);
+        }
+      } catch (error) {
+        console.error("Error handling building selection event:", error);
       }
     };
     
@@ -108,6 +132,7 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
     document.addEventListener(EVENTS.RESOURCES_UPDATED, handleResourcesUpdated as EventListener);
     document.addEventListener(EVENTS.UNITS_SELECTED, handleUnitsSelected as EventListener);
     document.addEventListener(EVENTS.SELECTION_CLEARED, handleSelectionCleared as EventListener);
+    document.addEventListener(EVENTS.BUILDING_SELECTED, handleBuildingSelected as EventListener);
     
     // Set up data access from Phaser game for items not yet converted to events
     const updateGameData = () => {

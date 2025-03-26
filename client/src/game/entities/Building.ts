@@ -495,6 +495,15 @@ export class Building {
   
   setSelected(selected: boolean) {
     this.selected = selected;
+    
+    // Update visual selection indicator
+    if (this.sprite && this.sprite.list && this.sprite.list.length > 0) {
+      // The selection indicator is typically the last item in the container
+      const selectionIndicator = this.sprite.list[this.sprite.list.length - 1];
+      if (selectionIndicator) {
+        (selectionIndicator as Phaser.GameObjects.Rectangle).setAlpha(selected ? 0.3 : 0);
+      }
+    }
   }
   
   takeDamage(amount: number) {
