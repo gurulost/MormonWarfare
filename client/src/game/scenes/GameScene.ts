@@ -653,11 +653,7 @@ export class GameScene extends Phaser.Scene {
     );
   }
   
-  // Track the selected building ID
-  private selectedBuildingId: string | null = null;
-  
   private setupSelectionEvents() {
-    // Start selection
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       // Skip if building placement is active
       if (this.buildingPlacementActive) return;
@@ -1279,11 +1275,14 @@ export class GameScene extends Phaser.Scene {
         unit.setSelected(true);
         
         // Emit the unit selection event
-        phaserEvents.emit(EVENTS.UNITS_SELECTED, {
-          unitIds: [unitId],
-          playerId: this.localPlayerId,
-          units: [unit]
+        const unitSelectedEvent = new CustomEvent(EVENTS.UNITS_SELECTED, {
+          detail: {
+            unitIds: [unitId],
+            playerId: this.localPlayerId,
+            units: [unit]
+          }
         });
+        document.dispatchEvent(unitSelectedEvent);
       }
       
       // Update UI

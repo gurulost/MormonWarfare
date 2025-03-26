@@ -368,19 +368,13 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
             const building = buildingManager.getBuilding(buildingId);
             console.log('Test building selection event: Selecting building', buildingId);
             
-            // Emit building selected event
-            const buildingSelectedEvent = new CustomEvent(EVENTS.BUILDING_SELECTED, {
-              detail: {
-                building,
-                playerId
-              }
-            });
-            document.dispatchEvent(buildingSelectedEvent);
+            // Use our new GameScene method to select the building
+            gameScene.selectBuildingById(buildingId);
             
-            // Set the building as selected
-            if (building) {
-              building.setSelected(true);
-            }
+            // This will now be handled by the scene, which will:
+            // 1. Set the building as selected
+            // 2. Emit the building selected event
+            // 3. Update the UI
           } else {
             console.warn("No player buildings found for selection test");
           }
