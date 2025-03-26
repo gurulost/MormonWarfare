@@ -12,6 +12,7 @@ import { EnhancedTechTreePanel } from "../ui/EnhancedTechTreePanel";
 import { useMultiplayer } from "../../lib/stores/useMultiplayer";
 import { useAudio } from "../../lib/stores/useAudio";
 import { TILE_SIZE, MAP_SIZE, CAMERA_SPEED } from "../config";
+import { phaserEvents, EVENTS } from "../events/PhaserEvents";
 
 export class GameScene extends Phaser.Scene {
   // Game data
@@ -1170,9 +1171,13 @@ export class GameScene extends Phaser.Scene {
   
   // Method to select a unit by ID - added for 3D view interaction
   selectUnitById(unitId: string): void {
-    // Skip multi-select check in 3D view since we can't easily check shift key from ThreeJS
-    // Just clear selection every time for now
+    // Clear current selection
     this.selectedUnits = [];
+    
+    // Deselect all units first
+    this.unitManager.getAllUnits().forEach(unit => {
+      unit.setSelected(false);
+    });
     
     // Find the unit
     const unit = this.unitManager.getUnit(unitId);
@@ -1181,6 +1186,13 @@ export class GameScene extends Phaser.Scene {
       if (!this.selectedUnits.includes(unitId)) {
         this.selectedUnits.push(unitId);
         unit.setSelected(true);
+        
+        // Emit the unit selection event
+        phaserEvents.emit(EVENTS.UNITS_SELECTED, {
+          unitIds: [unitId],
+          playerId: this.localPlayerId,
+          units: [unit]
+        });
       }
       
       // Update UI

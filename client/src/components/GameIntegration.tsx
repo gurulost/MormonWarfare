@@ -191,23 +191,27 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
       }
     }
     
-    // Create a test button for resource events
+    // Create a test div for event testing buttons
     const testDiv = document.createElement('div');
     testDiv.style.position = 'fixed';
     testDiv.style.bottom = '10px';
     testDiv.style.left = '10px';
     testDiv.style.zIndex = '1000';
+    testDiv.style.display = 'flex';
+    testDiv.style.flexDirection = 'column';
+    testDiv.style.gap = '5px';
     
-    const testButton = document.createElement('button');
-    testButton.textContent = 'Test Resource Event';
-    testButton.style.padding = '8px 16px';
-    testButton.style.backgroundColor = '#4CAF50';
-    testButton.style.color = 'white';
-    testButton.style.border = 'none';
-    testButton.style.borderRadius = '4px';
-    testButton.style.cursor = 'pointer';
+    // Resource event test button
+    const resourceTestButton = document.createElement('button');
+    resourceTestButton.textContent = 'Test Resource Event';
+    resourceTestButton.style.padding = '8px 16px';
+    resourceTestButton.style.backgroundColor = '#4CAF50';
+    resourceTestButton.style.color = 'white';
+    resourceTestButton.style.border = 'none';
+    resourceTestButton.style.borderRadius = '4px';
+    resourceTestButton.style.cursor = 'pointer';
     
-    testButton.onclick = () => {
+    resourceTestButton.onclick = () => {
       try {
         // Get the current local player ID
         const playerId = gameScene.getLocalPlayerId();
@@ -232,11 +236,87 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
           console.error("Resource manager not found");
         }
       } catch (error) {
-        console.error("Error in test button:", error);
+        console.error("Error in resource test button:", error);
       }
     };
     
-    testDiv.appendChild(testButton);
+    // Unit selection event test button
+    const selectionTestButton = document.createElement('button');
+    selectionTestButton.textContent = 'Test Unit Selection Event';
+    selectionTestButton.style.padding = '8px 16px';
+    selectionTestButton.style.backgroundColor = '#2196F3';
+    selectionTestButton.style.color = 'white';
+    selectionTestButton.style.border = 'none';
+    selectionTestButton.style.borderRadius = '4px';
+    selectionTestButton.style.cursor = 'pointer';
+    
+    selectionTestButton.onclick = () => {
+      try {
+        // Get the current local player ID
+        const playerId = gameScene.getLocalPlayerId();
+        if (!playerId) {
+          console.error("No local player ID found");
+          return;
+        }
+        
+        // Get a unit belonging to the player
+        const unitManager = gameScene.unitManager;
+        if (unitManager) {
+          const playerUnits = unitManager.getUnitsByPlayer(playerId);
+          if (playerUnits.length > 0) {
+            // Select the first unit
+            const unitId = playerUnits[0].id;
+            console.log('Test unit selection event: Selecting unit', unitId);
+            gameScene.selectUnitById(unitId);
+          } else {
+            console.warn("No player units found for selection test");
+          }
+        } else {
+          console.error("Unit manager not found");
+        }
+      } catch (error) {
+        console.error("Error in selection test button:", error);
+      }
+    };
+    
+    // Selection clear event test button
+    const clearSelectionButton = document.createElement('button');
+    clearSelectionButton.textContent = 'Test Clear Selection';
+    clearSelectionButton.style.padding = '8px 16px';
+    clearSelectionButton.style.backgroundColor = '#FF5722';
+    clearSelectionButton.style.color = 'white';
+    clearSelectionButton.style.border = 'none';
+    clearSelectionButton.style.borderRadius = '4px';
+    clearSelectionButton.style.cursor = 'pointer';
+    
+    clearSelectionButton.onclick = () => {
+      try {
+        // Get the current local player ID
+        const playerId = gameScene.getLocalPlayerId();
+        if (!playerId) {
+          console.error("No local player ID found");
+          return;
+        }
+        
+        console.log('Test clear selection event');
+        
+        // Use unit manager to emit a selection cleared event
+        const unitManager = gameScene.unitManager;
+        if (unitManager) {
+          // Create a rectangle outside the screen to clear all selections
+          const offscreenRect = new Phaser.Geom.Rectangle(-100, -100, 1, 1);
+          unitManager.selectUnitsInBounds(offscreenRect, playerId);
+        } else {
+          console.error("Unit manager not found");
+        }
+      } catch (error) {
+        console.error("Error in clear selection button:", error);
+      }
+    };
+    
+    testDiv.appendChild(resourceTestButton);
+    testDiv.appendChild(selectionTestButton);
+    testDiv.appendChild(clearSelectionButton);
     document.body.appendChild(testDiv);
 
     // Clean up
