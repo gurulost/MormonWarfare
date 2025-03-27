@@ -128,11 +128,37 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
       }
     };
     
+    // Set up tech research event listener
+    const handleTechResearched = (event: CustomEvent) => {
+      try {
+        const { techId, tech, playerId } = event.detail;
+        
+        // Only update for local player
+        if (playerId === gameScene.getLocalPlayerId()) {
+          console.log(`Tech researched via event: ${techId}`, tech);
+          
+          // Refresh available techs
+          const techManager = gameScene.techManager;
+          if (techManager) {
+            const player = gameScene.getLocalPlayerId();
+            const faction = gameScene.players.find((p: any) => p.id === player)?.faction;
+            if (player && faction) {
+              const techs = techManager.getResearchableTechs(player, faction);
+              setAvailableTechs(techs);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error handling tech research event:", error);
+      }
+    };
+    
     // Add event listeners
     document.addEventListener(EVENTS.RESOURCES_UPDATED, handleResourcesUpdated as EventListener);
     document.addEventListener(EVENTS.UNITS_SELECTED, handleUnitsSelected as EventListener);
     document.addEventListener(EVENTS.SELECTION_CLEARED, handleSelectionCleared as EventListener);
     document.addEventListener(EVENTS.BUILDING_SELECTED, handleBuildingSelected as EventListener);
+    document.addEventListener(EVENTS.TECH_RESEARCHED, handleTechResearched as EventListener);
     
     // Set up data access from Phaser game for items not yet converted to events
     const updateGameData = () => {
@@ -386,10 +412,68 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
       }
     };
 
+    // Tech research event test button
+    const techResearchButton = document.createElement('button');
+    techResearchButton.textContent = 'Test Tech Research';
+    techResearchButton.style.padding = '8px 16px';
+    techResearchButton.style.backgroundColor = '#4A9C20';
+    techResearchButton.style.color = 'white';
+    techResearchButton.style.border = 'none';
+    techResearchButton.style.borderRadius = '4px';
+    techResearchButton.style.cursor = 'pointer';
+    
+    techResearchButton.onclick = () => {
+      try {
+        // Get the current local player ID
+        const playerId = gameScene.getLocalPlayerId();
+        if (!playerId) {
+          console.error("No local player ID found");
+          return;
+        }
+        
+        // Get the tech manager
+        const techManager = gameScene.techManager;
+        if (techManager) {
+          // Get the player's faction
+          const faction = gameScene.players.find((p: any) => p.id === playerId)?.faction;
+          if (!faction) {
+            console.error("Player faction not found");
+            return;
+          }
+          
+          // Get first available tech
+          const techs = techManager.getResearchableTechs(playerId, faction);
+          if (techs.length > 0) {
+            const techToResearch = techs[0];
+            console.log(`Test tech research event: Researching ${techToResearch.name}`);
+            
+            // We'll need to grant some resources first for testing
+            const resourceManager = gameScene.resourceManager;
+            if (resourceManager) {
+              resourceManager.updateResources(playerId, { 
+                food: 1000, 
+                ore: 1000 
+              });
+            }
+            
+            // Research the tech
+            techManager.researchTechnology(techToResearch.id, playerId);
+          } else {
+            console.warn("No researchable techs available");
+          }
+        } else {
+          console.error("Tech manager not found");
+        }
+      } catch (error) {
+        console.error("Error in tech research test button:", error);
+      }
+    };
+    
     testDiv.appendChild(resourceTestButton);
     testDiv.appendChild(selectionTestButton);
     testDiv.appendChild(clearSelectionButton);
     testDiv.appendChild(buildingSelectionButton);
+    testDiv.appendChild(techResearchButton);
     document.body.appendChild(testDiv);
 
     // Clean up
@@ -402,6 +486,7 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
       document.removeEventListener(EVENTS.UNITS_SELECTED, handleUnitsSelected as EventListener);
       document.removeEventListener(EVENTS.SELECTION_CLEARED, handleSelectionCleared as EventListener);
       document.removeEventListener(EVENTS.BUILDING_SELECTED, handleBuildingSelected as EventListener);
+      document.removeEventListener(EVENTS.TECH_RESEARCHED, handleTechResearched as EventListener);
       
       // Remove test button
       if (document.body.contains(testDiv)) {

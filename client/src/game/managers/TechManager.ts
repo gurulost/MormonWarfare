@@ -5,6 +5,7 @@ import { useMultiplayer } from "../../lib/stores/useMultiplayer";
 import { useAudio } from "../../lib/stores/useAudio";
 import { Unit } from "../entities/Unit";
 import { Building } from "../entities/Building";
+import { EVENTS } from "../events/PhaserEvents";
 
 export class TechManager {
   private scene: Phaser.Scene;
@@ -436,6 +437,19 @@ export class TechManager {
     // Apply effects
     this.applyTechEffects(tech, playerId);
     
+    // Emit tech researched event
+    const techResearchedEvent = new CustomEvent(EVENTS.TECH_RESEARCHED, {
+      detail: {
+        techId,
+        tech,
+        playerId
+      }
+    });
+    document.dispatchEvent(techResearchedEvent);
+    
+    // Show tech researched effect
+    this.showTechResearchedEffect(tech);
+    
     // Sync with server (in a real implementation)
     const multiplayerStore = useMultiplayer.getState();
     multiplayerStore.researchTech(techId);
@@ -544,15 +558,6 @@ export class TechManager {
     const researchedTechs = this.scene.game.registry.get("researchedTechs") || {};
     researchedTechs[tech.id] = true;
     this.scene.game.registry.set("researchedTechs", researchedTechs);
-    
-    // Trigger event for UI updates
-    const event = new CustomEvent("techResearched", {
-      detail: { techId: tech.id, playerId, tech }
-    });
-    document.dispatchEvent(event);
-    
-    // Show a visual effect to indicate the tech was researched
-    this.showTechResearchedEffect(tech);
   }
   
   private showTechResearchedEffect(tech: TechInfo) {
