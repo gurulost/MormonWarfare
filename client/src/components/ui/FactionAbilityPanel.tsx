@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useFactionAbilities, AbilityState } from '../../lib/stores/useFactionAbilities';
+import { EVENTS } from '../../game/events/PhaserEvents';
 import './factionAbilities.css';
 
 interface FactionAbilityPanelProps {
@@ -78,10 +79,10 @@ export const FactionAbilityPanel: React.FC<FactionAbilityPanelProps> = ({ localP
     };
     
     // Add event listener
-    window.addEventListener('ability-activated', handleAbilityActivated as EventListener);
+    document.addEventListener(EVENTS.ABILITY_COMPLETED, handleAbilityActivated as EventListener);
     
     return () => {
-      window.removeEventListener('ability-activated', handleAbilityActivated as EventListener);
+      document.removeEventListener(EVENTS.ABILITY_COMPLETED, handleAbilityActivated as EventListener);
     };
   }, [currentFaction, abilities]);
   
@@ -141,10 +142,10 @@ const AbilityButton: React.FC<AbilityButtonProps> = ({ ability, faction, onClick
     onClick();
     
     // Dispatch the custom event to trigger ability activation in game
-    const event = new CustomEvent('activate-ability', {
+    const event = new CustomEvent(EVENTS.ABILITY_ACTIVATED, {
       detail: { abilityId: ability.id }
     });
-    window.dispatchEvent(event);
+    document.dispatchEvent(event);
   };
   
   return (

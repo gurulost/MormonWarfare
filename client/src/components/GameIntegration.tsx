@@ -671,10 +671,10 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
           });
           
           // Dispatch event based on whether any valid units were found
-          const abilityEvent = new CustomEvent('ability-activated', { 
+          const abilityEvent = new CustomEvent(EVENTS.ABILITY_COMPLETED, { 
             detail: { abilityId, success: validUnitFound } 
           });
-          window.dispatchEvent(abilityEvent);
+          document.dispatchEvent(abilityEvent);
           
           if (!validUnitFound) {
             console.warn('No Stripling Warriors selected for Faith Shield ability');
@@ -698,10 +698,10 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
           });
           
           // Dispatch event based on whether any valid units were found
-          const abilityEvent = new CustomEvent('ability-activated', { 
+          const abilityEvent = new CustomEvent(EVENTS.ABILITY_COMPLETED, { 
             detail: { abilityId, success: validUnitFound } 
           });
-          window.dispatchEvent(abilityEvent);
+          document.dispatchEvent(abilityEvent);
           
           if (!validUnitFound) {
             console.warn('No Lamanite Scouts selected for Stealth ability');
@@ -710,27 +710,27 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
         else {
           console.warn(`Ability ${ability.id} not implemented or not applicable to selected units`);
           // Dispatch event for failed activation
-          const abilityEvent = new CustomEvent('ability-activated', { 
+          const abilityEvent = new CustomEvent(EVENTS.ABILITY_COMPLETED, { 
             detail: { abilityId, success: false } 
           });
-          window.dispatchEvent(abilityEvent);
+          document.dispatchEvent(abilityEvent);
         }
       } else {
         console.warn('No units selected for ability activation');
         // Dispatch event for failed activation
-        const abilityEvent = new CustomEvent('ability-activated', { 
+        const abilityEvent = new CustomEvent(EVENTS.ABILITY_COMPLETED, { 
           detail: { abilityId, success: false } 
         });
-        window.dispatchEvent(abilityEvent);
+        document.dispatchEvent(abilityEvent);
       }
     };
     
     // Add event listener for ability activation
-    window.addEventListener('activate-ability', handleAbilityActivation as EventListener);
+    document.addEventListener(EVENTS.ABILITY_ACTIVATED, handleAbilityActivation as EventListener);
     
     // Clean up event listener
     return () => {
-      window.removeEventListener('activate-ability', handleAbilityActivation as EventListener);
+      document.removeEventListener(EVENTS.ABILITY_ACTIVATED, handleAbilityActivation as EventListener);
     };
   }, [gameInstance, abilities, playerFaction]);
   

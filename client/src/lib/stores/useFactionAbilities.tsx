@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { FactionType } from '../../game/types';
 import { FACTION_BONUSES } from '../../game/config';
 import { useAudio } from './useAudio';
+import { EVENTS } from '../../game/events/PhaserEvents';
 
 export interface AbilityState {
   id: string;
@@ -192,10 +193,10 @@ export const useFactionAbilities = create<FactionAbilityState>((set, get) => ({
     console.log(`Activated faction ability: ${ability.name}`);
     
     // Display visual feedback
-    const event = new CustomEvent('ability-activated', {
+    const event = new CustomEvent(EVENTS.ABILITY_COMPLETED, {
       detail: { abilityId: id, success: true, abilityName: ability.name }
     });
-    window.dispatchEvent(event);
+    document.dispatchEvent(event);
     
     return true;
   },
