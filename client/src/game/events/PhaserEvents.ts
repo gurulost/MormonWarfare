@@ -71,6 +71,34 @@ class PhaserEventEmitter extends EventTarget {
     
     console.log(`Event emitted: ${eventName}`, detail);
   }
+  
+  /**
+   * Register an event listener
+   * @param eventName The name of the event to listen for
+   * @param callback The callback function to execute when the event is received
+   */
+  on<T>(eventName: PhaserEventType, callback: (data: T) => void): void {
+    const wrappedCallback = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      callback(customEvent.detail);
+    };
+    
+    // Store the original callback and wrapped callback to use during removal
+    (callback as any).__wrapped = wrappedCallback;
+    
+    this.addEventListener(eventName, wrappedCallback);
+  }
+  
+  /**
+   * Remove an event listener
+   * @param eventName The name of the event to stop listening for
+   * @param callback The callback function to remove
+   */
+  off<T>(eventName: PhaserEventType, callback: (data: T) => void): void {
+    // Use the stored wrapped callback if available
+    const wrappedCallback = (callback as any).__wrapped || callback;
+    this.removeEventListener(eventName, wrappedCallback);
+  }
 }
 
 // Create a singleton instance to be used throughout the application

@@ -5,7 +5,7 @@ import { useMultiplayer } from "@/lib/stores/useMultiplayer";
 import GameOverlay from "@/components/3d/GameOverlay";
 import FactionAbilityPanel from "@/components/ui/FactionAbilityPanel";
 import { useFactionAbilities } from "@/lib/stores/useFactionAbilities";
-import { EVENTS } from "@/game/events/PhaserEvents";
+import { EVENTS, phaserEvents } from "@/game/events/PhaserEvents";
 
 interface GameIntegrationProps {
   gameInstance?: Phaser.Game;
@@ -627,14 +627,14 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
   
   // Handle faction ability activation
   useEffect(() => {
-    // Create custom event listener for ability activation
-    const handleAbilityActivation = (event: CustomEvent) => {
+    // Create event listener for ability activation using phaserEvents
+    const handleAbilityActivation = (data: { abilityId: string }) => {
       if (!gameInstance) return;
       
       const gameScene = gameInstance.scene.getScene("GameScene") as any;
       if (!gameScene) return;
       
-      const { abilityId } = event.detail;
+      const { abilityId } = data;
       console.log(`Activating ability: ${abilityId}`);
       
       // Log the current faction and all abilities
@@ -670,11 +670,11 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
             }
           });
           
-          // Dispatch event based on whether any valid units were found
-          const abilityEvent = new CustomEvent(EVENTS.ABILITY_COMPLETED, { 
-            detail: { abilityId, success: validUnitFound } 
+          // Dispatch event using phaserEvents event emitter
+          phaserEvents.emit(EVENTS.ABILITY_COMPLETED, { 
+            abilityId, 
+            success: validUnitFound 
           });
-          document.dispatchEvent(abilityEvent);
           
           if (!validUnitFound) {
             console.warn('No Stripling Warriors selected for Faith Shield ability');
@@ -697,11 +697,11 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
             }
           });
           
-          // Dispatch event based on whether any valid units were found
-          const abilityEvent = new CustomEvent(EVENTS.ABILITY_COMPLETED, { 
-            detail: { abilityId, success: validUnitFound } 
+          // Dispatch event using phaserEvents event emitter
+          phaserEvents.emit(EVENTS.ABILITY_COMPLETED, { 
+            abilityId, 
+            success: validUnitFound 
           });
-          document.dispatchEvent(abilityEvent);
           
           if (!validUnitFound) {
             console.warn('No Lamanite Scouts selected for Stealth ability');
@@ -710,27 +710,27 @@ export const GameIntegration: React.FC<GameIntegrationProps> = ({ gameInstance }
         else {
           console.warn(`Ability ${ability.id} not implemented or not applicable to selected units`);
           // Dispatch event for failed activation
-          const abilityEvent = new CustomEvent(EVENTS.ABILITY_COMPLETED, { 
-            detail: { abilityId, success: false } 
+          phaserEvents.emit(EVENTS.ABILITY_COMPLETED, { 
+            abilityId, 
+            success: false 
           });
-          document.dispatchEvent(abilityEvent);
         }
       } else {
         console.warn('No units selected for ability activation');
         // Dispatch event for failed activation
-        const abilityEvent = new CustomEvent(EVENTS.ABILITY_COMPLETED, { 
-          detail: { abilityId, success: false } 
+        phaserEvents.emit(EVENTS.ABILITY_COMPLETED, { 
+          abilityId, 
+          success: false 
         });
-        document.dispatchEvent(abilityEvent);
       }
     };
     
-    // Add event listener for ability activation
-    document.addEventListener(EVENTS.ABILITY_ACTIVATED, handleAbilityActivation as EventListener);
+    // Add event listener using phaserEvents
+    phaserEvents.on(EVENTS.ABILITY_ACTIVATED, handleAbilityActivation);
     
     // Clean up event listener
     return () => {
-      document.removeEventListener(EVENTS.ABILITY_ACTIVATED, handleAbilityActivation as EventListener);
+      phaserEvents.off(EVENTS.ABILITY_ACTIVATED, handleAbilityActivation);
     };
   }, [gameInstance, abilities, playerFaction]);
   

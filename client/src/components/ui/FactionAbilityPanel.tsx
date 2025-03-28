@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useFactionAbilities, AbilityState } from '../../lib/stores/useFactionAbilities';
-import { EVENTS } from '../../game/events/PhaserEvents';
+import { EVENTS, phaserEvents } from '../../game/events/PhaserEvents';
 import './factionAbilities.css';
 
 interface FactionAbilityPanelProps {
@@ -40,8 +40,8 @@ export const FactionAbilityPanel: React.FC<FactionAbilityPanelProps> = ({ localP
   
   // Listen for ability activation events
   useEffect(() => {
-    const handleAbilityActivated = (event: CustomEvent) => {
-      const { abilityId, success } = event.detail;
+    const handleAbilityActivated = (data: { abilityId: string, success: boolean }) => {
+      const { abilityId, success } = data;
       
       // Find the ability that was activated
       const ability = abilities.find(a => a.id === abilityId);
@@ -78,11 +78,12 @@ export const FactionAbilityPanel: React.FC<FactionAbilityPanelProps> = ({ localP
       }
     };
     
-    // Add event listener
-    document.addEventListener(EVENTS.ABILITY_COMPLETED, handleAbilityActivated as EventListener);
+    // Add event listener using phaserEvents
+    phaserEvents.on(EVENTS.ABILITY_COMPLETED, handleAbilityActivated);
     
     return () => {
-      document.removeEventListener(EVENTS.ABILITY_COMPLETED, handleAbilityActivated as EventListener);
+      // Remove event listener
+      phaserEvents.off(EVENTS.ABILITY_COMPLETED, handleAbilityActivated);
     };
   }, [currentFaction, abilities]);
   
@@ -141,11 +142,8 @@ const AbilityButton: React.FC<AbilityButtonProps> = ({ ability, faction, onClick
     // Call the onClick handler (activateAbility)
     onClick();
     
-    // Dispatch the custom event to trigger ability activation in game
-    const event = new CustomEvent(EVENTS.ABILITY_ACTIVATED, {
-      detail: { abilityId: ability.id }
-    });
-    document.dispatchEvent(event);
+    // Dispatch the event using phaserEvents to trigger ability activation in game
+    phaserEvents.emit(EVENTS.ABILITY_ACTIVATED, { abilityId: ability.id });
   };
   
   return (
